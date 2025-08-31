@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional, List
 from web3 import Web3
-from web3.middleware import geth_poa_middleware
+from web3.middleware import construct_simple_cache_middleware
 import requests
 from config import Config
 from db import get_db_session, Trade, User, Wallet
@@ -15,7 +15,7 @@ class TradeExecutor:
     
     def __init__(self):
         self.web3 = Web3(Web3.HTTPProvider(Config.ETHEREUM_RPC_URL))
-        self.web3.middleware_onion.inject(geth_poa_middleware, layer=0)  # For testnets
+        self.web3.middleware_onion.inject(construct_simple_cache_middleware(), layer=0)  # For caching
         self.chain_id = Config.CHAIN_ID
         self.zeroex_api_url = "https://sepolia.api.0x.org"  # Sepolia testnet
         
