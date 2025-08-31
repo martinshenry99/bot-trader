@@ -15,7 +15,7 @@ class TradeExecutor:
     
     def __init__(self):
         self.web3 = Web3(Web3.HTTPProvider(Config.ETHEREUM_RPC_URL))
-        self.web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)  # For testnets
+        # Note: POA middleware not needed for this implementation
         self.chain_id = Config.CHAIN_ID
         self.zeroex_api_url = "https://sepolia.api.0x.org"  # Sepolia testnet
         
