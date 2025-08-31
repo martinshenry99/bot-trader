@@ -1,0 +1,11 @@
+{
+  "address": "0xf7b730513383505AD66C5F0c12Dc857cf64621F0",
+  "keystore_file": null,
+  "created_at": "2024-08-31T22:30:00Z",
+  "purpose": "Meme Trader V4 Pro Execution Wallet",
+  "networks": [
+    "Ethereum Sepolia",
+    "BSC Testnet"
+  ],
+  "security_note": "Private key encrypted in keystore file"
+}
