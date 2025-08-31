@@ -110,9 +110,11 @@ class ComprehensiveBackendTester:
             db.add(test_wallet)
             db.commit()
             
-            # Test Token creation
+            # Test Token creation (use unique address)
+            import time
+            unique_address = f"0xA0b86a33E6441ba0BB7e1ae5E3e7BAaD5D1D7e{int(time.time()) % 1000:03d}"
             test_token = Token(
-                address="0xA0b86a33E6441ba0BB7e1ae5E3e7BAaD5D1D7e3c",
+                address=unique_address,
                 symbol="TEST",
                 name="Test Token",
                 decimals=18,
