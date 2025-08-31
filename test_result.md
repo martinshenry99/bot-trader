@@ -30,12 +30,16 @@ Implement advanced trading engine for Meme Trader V4 Pro with:
 - 🔄 Ready for backend testing
 
 ## Backend Testing Requirements
-- Test trading engine initialization
-- Test API integrations (0x, Jupiter, CoinGecko, GoPlus)
-- Test mirror trading logic
+- Test startup sequence and integration initialization
+- Test API integrations (0x, Jupiter, CoinGecko, GoPlus, Covalent) health checks
+- Test trading engine initialization and configuration
+- Test mirror trading logic (buy signal processing, sell signal processing)
 - Test risk assessment functionality
 - Test panic sell functionality
-- Test wallet management
+- Test portfolio summary and trading stats
+- Test wallet management and keystore operations
+- Test Jupiter integration for Solana trading
+- Test 0x integration for EVM trading
 
 ## Frontend Testing Requirements
 - N/A (Currently backend-focused implementation)
