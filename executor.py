@@ -3,7 +3,6 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional, List
 from web3 import Web3
-from web3.middleware import ExtraDataToPOAMiddleware
 import requests
 from config import Config
 from db import get_db_session, Trade, User, Wallet
