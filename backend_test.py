@@ -30,14 +30,14 @@ class ComprehensiveBackendTester:
         self.tests_passed = 0
         self.test_results = []
         
-    def run_test(self, test_name: str, test_func, *args, **kwargs):
+    async def run_test(self, test_name: str, test_func, *args, **kwargs):
         """Run a single test and track results"""
         self.tests_run += 1
         print(f"\n🔍 Testing {test_name}...")
         
         try:
             if asyncio.iscoroutinefunction(test_func):
-                result = asyncio.run(test_func(*args, **kwargs))
+                result = await test_func(*args, **kwargs)
             else:
                 result = test_func(*args, **kwargs)
             
