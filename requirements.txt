@@ -1,7 +1,6 @@
 python-telegram-bot
 requests
 web3
-solana
 sqlalchemy
 cryptography
 python-dotenv
@@ -10,8 +9,6 @@ asyncio
 emergentintegrations
 websockets
 eth-account
-solders
-solana-py
 pytest
 pytest-asyncio
 eth-keyfile
