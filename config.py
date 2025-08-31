@@ -7,22 +7,25 @@ class Config:
     # Telegram
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     
-    # Covalent API
+    # API Keys
     COVALENT_API_KEY = os.getenv('COVALENT_API_KEY')
+    ZEROX_API_KEY = os.getenv('ZEROX_API_KEY')
+    GOPLUS_API_KEY = os.getenv('GOPLUS_API_KEY') 
+    COINGECKO_API_KEY = os.getenv('COINGECKO_API_KEY')
     
     # Ethereum Configuration
-    ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://sepolia.infura.io/v3/YOUR_INFURA_KEY')
+    ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://eth-sepolia.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
     CHAIN_ID = int(os.getenv('CHAIN_ID', '11155111'))  # Sepolia testnet
     NETWORK_NAME = os.getenv('NETWORK_NAME', 'sepolia')
     
     # BSC Configuration
-    BSC_RPC_URL = os.getenv('BSC_RPC_URL', 'https://data-seed-prebsc-1-s1.binance.org:8545')
+    BSC_RPC_URL = os.getenv('BSC_RPC_URL', 'https://bnb-testnet.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
     BSC_CHAIN_ID = int(os.getenv('BSC_CHAIN_ID', '97'))  # BSC testnet
     BSC_NETWORK_NAME = os.getenv('BSC_NETWORK_NAME', 'bsc-testnet')
     
     # Alchemy WebSocket URLs
-    ALCHEMY_ETH_WS_URL = os.getenv('ALCHEMY_ETH_WS_URL', 'wss://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY')
-    ALCHEMY_BSC_WS_URL = os.getenv('ALCHEMY_BSC_WS_URL', 'wss://bsc-testnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY')
+    ALCHEMY_ETH_WS_URL = os.getenv('ALCHEMY_ETH_WS_URL', 'wss://eth-sepolia.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
+    ALCHEMY_BSC_WS_URL = os.getenv('ALCHEMY_BSC_WS_URL', 'wss://bnb-testnet.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
     
     # 0x Protocol APIs
     ZEROEX_ETH_API = os.getenv('ZEROEX_ETH_API', 'https://sepolia.api.0x.org')
@@ -30,7 +33,7 @@ class Config:
     
     # Jupiter/Solana Configuration
     JUPITER_API_URL = os.getenv('JUPITER_API_URL', 'https://quote-api.jup.ag/v6')
-    SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://api.devnet.solana.com')
+    SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-devnet.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
     SOLANA_NETWORK = os.getenv('SOLANA_NETWORK', 'devnet')
     
     # Database
@@ -54,7 +57,7 @@ class Config:
     
     # Security Settings
     KEYSTORE_PASSWORD_REQUIRED = os.getenv('KEYSTORE_PASSWORD_REQUIRED', 'true').lower() == 'true'
-    DRY_RUN_MODE = os.getenv('DRY_RUN_MODE', 'true').lower() == 'true'
+    DRY_RUN_MODE = os.getenv('DRY_RUN_MODE', 'false').lower() == 'true'
     
     # Router Addresses (for honeypot detection)
     UNISWAP_V2_ROUTER = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
