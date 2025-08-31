@@ -1122,6 +1122,14 @@ def main():
     """Start the enhanced bot"""
     print('🤖 Meme Trader V4 Pro Enhanced Bot starting...')
     
+    # Run startup sequence
+    from startup import run_startup
+    startup_success = run_startup()
+    
+    if not startup_success:
+        print('❌ Failed to initialize integrations. Exiting...')
+        return
+    
     # Create database tables
     create_tables()
     
@@ -1148,9 +1156,10 @@ def main():
     
     # Start the bot
     print('✅ Enhanced Bot is ready and listening for messages!')
-    print('🔥 New features: /buy, /sell commands with comprehensive pre-trade analysis')
+    print('🔥 New features: /buy, /sell, /panic_sell, /portfolio, /settings commands')
     print('🛡️  Enhanced security: Honeypot simulation, gas optimization, risk assessment')
     print('📡 Real-time monitoring: Mempool tracking, price alerts, portfolio analytics')
+    print('🚀 Multi-chain: Ethereum, BSC, and Solana trading with mirror functionality')
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
