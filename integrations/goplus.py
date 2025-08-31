@@ -2,6 +2,7 @@
 GoPlus API integration for token security and honeypot detection
 """
 
+import asyncio
 import logging
 from typing import Dict, List, Optional, Any
 from .base import BaseAPIClient
