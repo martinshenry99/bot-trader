@@ -533,7 +533,390 @@ class TradingEngine:
         # Placeholder - would implement proper position tracking
         return []
     
-    # Additional helper methods would be implemented here...
+    async def _execute_mirror_buy(self, token_address: str, amount_usd: float, 
+                                blockchain: str, user_id: str, signal: TradeSignal) -> Dict[str, Any]:
+        """Execute mirror buy order"""
+        try:
+            logger.info(f"Executing mirror buy: ${amount_usd} of {token_address}")
+            
+            # Use the executor to perform the buy
+            from executor import AdvancedTradeExecutor
+            executor = AdvancedTradeExecutor()
+            
+            # Build trade parameters
+            trade_params = {
+                'user_id': int(user_id),
+                'action': 'buy',
+                'token_address': token_address,
+                'amount_usd': amount_usd,
+                'blockchain': blockchain,
+                'trade_type': TradeType.MIRROR_BUY,
+                'source_signal': signal.__dict__
+            }
+            
+            # Execute trade
+            result = await executor.execute_trade(trade_params)
+            
+            # Update trade history
+            if result['success']:
+                self.stats['total_trades'] += 1
+                self.stats['successful_trades'] += 1
+                self.stats['total_pnl_usd'] += result.get('estimated_value', 0) - amount_usd
+                
+                # Track position
+                self.mirror_positions[f"{user_id}_{token_address}"] = {
+                    'token_address': token_address,
+                    'amount': result.get('tokens_received', 0),
+                    'entry_price': amount_usd,
+                    'entry_time': datetime.utcnow(),
+                    'source_wallet': signal.source_wallet
+                }
+            else:
+                self.stats['failed_trades'] += 1
+            
+            self._update_win_rate()
+            return result
+            
+        except Exception as e:
+            logger.error(f"Mirror buy execution failed: {e}")
+            self.stats['failed_trades'] += 1
+            self._update_win_rate()
+            return {'success': False, 'reason': 'mirror_buy_error', 'error': str(e)}
+    
+    async def _execute_mirror_sell(self, token_address: str, token_amount: float, 
+                                 blockchain: str, user_id: str, signal: TradeSignal) -> Dict[str, Any]:
+        """Execute mirror sell order"""
+        try:
+            logger.info(f"Executing mirror sell: {token_amount} of {token_address}")
+            
+            # Use the executor to perform the sell
+            from executor import AdvancedTradeExecutor
+            executor = AdvancedTradeExecutor()
+            
+            # Build trade parameters
+            trade_params = {
+                'user_id': int(user_id),
+                'action': 'sell',
+                'token_address': token_address,
+                'token_amount': token_amount,
+                'blockchain': blockchain,
+                'trade_type': TradeType.MIRROR_SELL,
+                'source_signal': signal.__dict__
+            }
+            
+            # Execute trade
+            result = await executor.execute_trade(trade_params)
+            
+            # Update trade history and positions
+            if result['success']:
+                self.stats['total_trades'] += 1
+                self.stats['successful_trades'] += 1
+                
+                # Calculate P&L
+                position_key = f"{user_id}_{token_address}"
+                if position_key in self.mirror_positions:
+                    position = self.mirror_positions[position_key]
+                    pnl = result.get('usd_received', 0) - position['entry_price']
+                    self.stats['total_pnl_usd'] += pnl
+                    
+                    # Remove or update position
+                    del self.mirror_positions[position_key]
+            else:
+                self.stats['failed_trades'] += 1
+            
+            self._update_win_rate()
+            return result
+            
+        except Exception as e:
+            logger.error(f"Mirror sell execution failed: {e}")
+            self.stats['failed_trades'] += 1
+            self._update_win_rate()
+            return {'success': False, 'reason': 'mirror_sell_error', 'error': str(e)}
+    
+    async def _execute_buy_order(self, token_address: str, amount_usd: float, 
+                               blockchain: str, user_id: str, trade_type: TradeType) -> Dict[str, Any]:
+        """Execute buy order using appropriate executor"""
+        try:
+            if blockchain.lower() == 'solana':
+                return await self._execute_solana_buy(token_address, amount_usd, user_id, trade_type)
+            else:
+                return await self._execute_evm_buy(token_address, amount_usd, blockchain, user_id, trade_type)
+                
+        except Exception as e:
+            logger.error(f"Buy order execution failed: {e}")
+            return {'success': False, 'reason': 'buy_execution_error', 'error': str(e)}
+    
+    async def _execute_sell_order(self, token_address: str, token_amount: float, 
+                                blockchain: str, user_id: str, trade_type: TradeType, 
+                                max_slippage: float = None) -> Dict[str, Any]:
+        """Execute sell order using appropriate executor"""
+        try:
+            if blockchain.lower() == 'solana':
+                return await self._execute_solana_sell(token_address, token_amount, user_id, trade_type, max_slippage)
+            else:
+                return await self._execute_evm_sell(token_address, token_amount, blockchain, user_id, trade_type, max_slippage)
+                
+        except Exception as e:
+            logger.error(f"Sell order execution failed: {e}")
+            return {'success': False, 'reason': 'sell_execution_error', 'error': str(e)}
+    
+    async def _execute_evm_buy(self, token_address: str, amount_usd: float, 
+                             blockchain: str, user_id: str, trade_type: TradeType) -> Dict[str, Any]:
+        """Execute EVM (Ethereum/BSC) buy order"""
+        try:
+            from executor import AdvancedTradeExecutor
+            executor = AdvancedTradeExecutor()
+            
+            # Get wrapped native token for the chain
+            wrapped_native = self._get_wrapped_native_token(blockchain)
+            
+            trade_params = {
+                'user_id': int(user_id),
+                'sell_token': wrapped_native,
+                'buy_token': token_address,
+                'sell_amount_usd': amount_usd,
+                'slippage': self.config['max_slippage'],
+                'blockchain': blockchain
+            }
+            
+            result = await executor.execute_0x_trade(trade_params)
+            return result
+            
+        except Exception as e:
+            logger.error(f"EVM buy execution failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _execute_evm_sell(self, token_address: str, token_amount: float, 
+                              blockchain: str, user_id: str, trade_type: TradeType, max_slippage: float = None) -> Dict[str, Any]:
+        """Execute EVM (Ethereum/BSC) sell order"""
+        try:
+            from executor import AdvancedTradeExecutor
+            executor = AdvancedTradeExecutor()
+            
+            # Get wrapped native token for the chain
+            wrapped_native = self._get_wrapped_native_token(blockchain)
+            
+            trade_params = {
+                'user_id': int(user_id),
+                'sell_token': token_address,
+                'buy_token': wrapped_native,
+                'sell_amount_tokens': token_amount,
+                'slippage': max_slippage or self.config['max_slippage'],
+                'blockchain': blockchain
+            }
+            
+            result = await executor.execute_0x_trade(trade_params)
+            return result
+            
+        except Exception as e:
+            logger.error(f"EVM sell execution failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _execute_solana_buy(self, token_address: str, amount_usd: float, 
+                                user_id: str, trade_type: TradeType) -> Dict[str, Any]:
+        """Execute Solana buy order using Jupiter"""
+        try:
+            from executor import AdvancedTradeExecutor
+            executor = AdvancedTradeExecutor()
+            
+            # SOL mint address (native token)
+            sol_mint = "So11111111111111111111111111111111111111112"
+            
+            trade_params = {
+                'user_id': int(user_id),
+                'input_mint': sol_mint,
+                'output_mint': token_address,
+                'amount_usd': amount_usd,
+                'slippage_bps': int(self.config['max_slippage'] * 10000),
+                'blockchain': 'solana'
+            }
+            
+            result = await executor.execute_jupiter_trade(trade_params)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Solana buy execution failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _execute_solana_sell(self, token_address: str, token_amount: float, 
+                                 user_id: str, trade_type: TradeType, max_slippage: float = None) -> Dict[str, Any]:
+        """Execute Solana sell order using Jupiter"""
+        try:
+            from executor import AdvancedTradeExecutor
+            executor = AdvancedTradeExecutor()
+            
+            # SOL mint address (native token)
+            sol_mint = "So11111111111111111111111111111111111111112"
+            
+            trade_params = {
+                'user_id': int(user_id),
+                'input_mint': token_address,
+                'output_mint': sol_mint,
+                'token_amount': token_amount,
+                'slippage_bps': int((max_slippage or self.config['max_slippage']) * 10000),
+                'blockchain': 'solana'
+            }
+            
+            result = await executor.execute_jupiter_trade(trade_params)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Solana sell execution failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _get_wrapped_native_token(self, blockchain: str) -> str:
+        """Get wrapped native token address for blockchain"""
+        tokens = {
+            'ethereum': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',  # WETH
+            'bsc': '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',       # WBNB
+            'polygon': '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270'     # WMATIC
+        }
+        return tokens.get(blockchain.lower(), tokens['ethereum'])
+    
+    async def _send_buy_alert(self, signal: TradeSignal, user_id: str):
+        """Send buy alert to user for manual decision"""
+        try:
+            # This would integrate with the Telegram bot to send alerts
+            logger.info(f"Sending buy alert to user {user_id} for {signal.token_address}")
+            # Implementation would send Telegram message with buy recommendation
+            
+        except Exception as e:
+            logger.error(f"Failed to send buy alert: {e}")
+    
+    async def _send_risk_alert(self, signal: TradeSignal, risk_assessment: RiskAssessment, user_id: str):
+        """Send risk alert to user"""
+        try:
+            logger.warning(f"Sending risk alert to user {user_id}: {risk_assessment.risk_level.value}")
+            # Implementation would send Telegram message with risk warning
+            
+        except Exception as e:
+            logger.error(f"Failed to send risk alert: {e}")
+    
+    def _update_win_rate(self):
+        """Update win rate statistics"""
+        if self.stats['total_trades'] > 0:
+            self.stats['win_rate'] = (self.stats['successful_trades'] / self.stats['total_trades']) * 100
+        else:
+            self.stats['win_rate'] = 0.0
+    
+    async def force_buy(self, user_id: str, token_address: str, amount_usd: float, 
+                       blockchain: str = 'ethereum') -> Dict[str, Any]:
+        """Force buy bypassing safe mode restrictions"""
+        try:
+            logger.warning(f"FORCE BUY initiated by user {user_id}: ${amount_usd} of {token_address}")
+            
+            # Temporarily disable safe mode
+            original_safe_mode = self.config['safe_mode']
+            self.config['safe_mode'] = False
+            
+            try:
+                result = await self.execute_manual_buy(user_id, token_address, amount_usd, blockchain)
+                return result
+            finally:
+                # Restore safe mode
+                self.config['safe_mode'] = original_safe_mode
+                
+        except Exception as e:
+            logger.error(f"Force buy failed: {e}")
+            return {'success': False, 'reason': 'force_buy_error', 'error': str(e)}
+    
+    async def update_config(self, user_id: str, config_updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update trading configuration"""
+        try:
+            logger.info(f"Updating config for user {user_id}: {config_updates}")
+            
+            # Validate and update configuration
+            valid_keys = {
+                'safe_mode', 'mirror_sell_enabled', 'mirror_buy_enabled',
+                'max_auto_buy_usd', 'max_position_size_usd', 'max_slippage',
+                'min_liquidity_usd'
+            }
+            
+            updated_keys = []
+            for key, value in config_updates.items():
+                if key in valid_keys:
+                    self.config[key] = value
+                    updated_keys.append(key)
+            
+            return {
+                'success': True,
+                'updated_keys': updated_keys,
+                'current_config': {k: v for k, v in self.config.items() if k in valid_keys}
+            }
+            
+        except Exception as e:
+            logger.error(f"Config update failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def get_portfolio_summary(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive portfolio summary"""
+        try:
+            # Get all user positions
+            positions = await self._get_all_user_positions(user_id)
+            
+            # Calculate portfolio metrics
+            total_value_usd = 0.0
+            total_pnl_usd = 0.0
+            position_count = len(positions)
+            
+            position_details = []
+            for position in positions:
+                # Get current price
+                current_price = await self._get_token_current_price(position['token_address'])
+                current_value = position['amount'] * current_price
+                pnl = current_value - position.get('entry_value', 0)
+                
+                total_value_usd += current_value
+                total_pnl_usd += pnl
+                
+                position_details.append({
+                    'token_address': position['token_address'],
+                    'token_symbol': position.get('token_symbol', 'UNKNOWN'),
+                    'amount': position['amount'],
+                    'entry_price': position.get('entry_price', 0),
+                    'current_price': current_price,
+                    'current_value_usd': current_value,
+                    'pnl_usd': pnl,
+                    'pnl_percentage': (pnl / position.get('entry_value', 1)) * 100 if position.get('entry_value') else 0
+                })
+            
+            # Get trading stats
+            trading_stats = await self.get_trading_stats(user_id)
+            
+            return {
+                'portfolio_value_usd': total_value_usd,
+                'total_pnl_usd': total_pnl_usd,
+                'position_count': position_count,
+                'positions': position_details,
+                'trading_stats': trading_stats,
+                'mirror_positions': len(self.mirror_positions),
+                'performance_metrics': {
+                    'win_rate': self.stats['win_rate'],
+                    'total_trades': self.stats['total_trades'],
+                    'successful_trades': self.stats['successful_trades'],
+                    'moonshots_detected': self.stats['moonshots_detected']
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Portfolio summary failed: {e}")
+            return {'error': str(e)}
+    
+    async def _get_token_current_price(self, token_address: str) -> float:
+        """Get current USD price for token"""
+        try:
+            # Use CoinGecko client for price data
+            coingecko_client = integration_manager.get_client('coingecko')
+            if coingecko_client:
+                token_info = await coingecko_client.get_token_info(token_address)
+                if token_info:
+                    return token_info.get('current_price', 0.0)
+            
+            return 0.0
+            
+        except Exception as e:
+            logger.error(f"Failed to get token price: {e}")
+            return 0.0
     
     async def get_trading_stats(self, user_id: str) -> Dict[str, Any]:
         """Get trading statistics for user"""
