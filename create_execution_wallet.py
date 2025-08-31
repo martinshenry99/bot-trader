@@ -39,13 +39,20 @@ def create_execution_wallet():
     keystore_path = os.path.join(keystore_dir, keystore_filename)
     
     try:
-        # Create encrypted keystore
-        KeystoreManager.create_keystore(private_key, keystore_password, keystore_path)
+        # Create encrypted keystore directly
+        encrypted = account.encrypt(keystore_password.encode())
+        
+        with open(keystore_path, 'w') as f:
+            json.dump(encrypted, f)
         
         print(f"🔒 Keystore created: {keystore_path}")
         
         # Test keystore loading
-        loaded_key = KeystoreManager.load_keystore(keystore_path, keystore_password)
+        with open(keystore_path, 'r') as f:
+            keystore_data = json.load(f)
+        
+        from eth_keyfile import extract_key_from_keyfile
+        loaded_key = extract_key_from_keyfile(keystore_data, keystore_password.encode())
         test_account = Account.from_key(loaded_key)
         
         assert test_account.address == account.address, "Keystore verification failed!"
@@ -53,7 +60,8 @@ def create_execution_wallet():
         
     except Exception as e:
         print(f"❌ Keystore creation failed: {e}")
-        return None
+        print("⚠️  Continuing with private key only...")
+        keystore_path = None
     
     # Create wallet info file
     wallet_info = {
