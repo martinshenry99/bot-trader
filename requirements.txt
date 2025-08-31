@@ -1,0 +1,6 @@
+python-telegram-bot
+requests
+web3
+solana
+sqlalchemy
+cryptography

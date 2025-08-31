@@ -1,0 +1,4 @@
+*.env
+keystores/
+logs/
+db.sqlite3
