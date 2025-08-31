@@ -1135,8 +1135,12 @@ def main():
     application.add_handler(CommandHandler("buy", bot.buy_command))
     application.add_handler(CommandHandler("sell", bot.sell_command))
     application.add_handler(CommandHandler("analyze", bot.analyze_command))
+    application.add_handler(CommandHandler("panic_sell", bot.panic_sell_command))
+    application.add_handler(CommandHandler("settings", bot.settings_command))
+    application.add_handler(CommandHandler("portfolio", bot.portfolio_command))
     
     # Add callback handler for inline keyboards
+    application.add_handler(CallbackQueryHandler(bot.handle_callback_query))
     application.add_handler(CallbackQueryHandler(bot.button_handler))
     
     # Add error handler
