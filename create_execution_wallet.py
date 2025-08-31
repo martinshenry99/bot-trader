@@ -27,10 +27,8 @@ def create_execution_wallet():
     print(f"🔑 **Private Key:** {private_key}")
     
     # Create keystore file with password protection
-    keystore_password = input("\n🔐 Enter password for keystore encryption (or press Enter for default): ").strip()
-    if not keystore_password:
-        keystore_password = "MemeTrader2024!"
-        print(f"📝 Using default password: {keystore_password}")
+    keystore_password = "MemeTrader2024!"  # Default password for automation
+    print(f"📝 Using default password: {keystore_password}")
     
     # Create keystore directory
     keystore_dir = "/app/keystores"
