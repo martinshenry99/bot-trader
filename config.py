@@ -31,6 +31,7 @@ class Config:
     # AI Settings
     AI_SCORING_ENABLED = os.getenv('AI_SCORING_ENABLED', 'true').lower() == 'true'
     SENTIMENT_ANALYSIS_ENABLED = os.getenv('SENTIMENT_ANALYSIS_ENABLED', 'true').lower() == 'true'
+    EMERGENT_LLM_KEY = os.getenv('EMERGENT_LLM_KEY')
     
     @classmethod
     def validate(cls):
