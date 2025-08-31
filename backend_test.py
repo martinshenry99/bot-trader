@@ -505,43 +505,43 @@ class ComprehensiveBackendTester:
         
         # Database Tests
         print("\n📊 DATABASE TESTS")
-        self.run_test("Database Schema", self.test_database_schema)
-        self.run_test("Database CRUD Operations", self.test_database_crud_operations)
+        await self.run_test("Database Schema", self.test_database_schema)
+        await self.run_test("Database CRUD Operations", self.test_database_crud_operations)
         
         # Configuration Tests
         print("\n⚙️ CONFIGURATION TESTS")
-        self.run_test("Configuration Validation", self.test_configuration_validation)
+        await self.run_test("Configuration Validation", self.test_configuration_validation)
         
         # API Client Tests
         print("\n🌐 API CLIENT TESTS")
-        self.run_test("Covalent API Client", self.test_covalent_api_client)
+        await self.run_test("Covalent API Client", self.test_covalent_api_client)
         
         # Analyzer Tests
         print("\n🔍 ANALYZER TESTS")
-        self.run_test("Token Analyzer", self.test_token_analyzer)
-        self.run_test("Market Analyzer", self.test_market_analyzer)
+        await self.run_test("Token Analyzer", self.test_token_analyzer)
+        await self.run_test("Market Analyzer", self.test_market_analyzer)
         
         # AI Features Tests
         print("\n🤖 AI FEATURES TESTS")
-        self.run_test("AI Analyst", self.test_ai_analyst)
-        self.run_test("Smart Trading Engine", self.test_smart_trading_engine)
+        await self.run_test("AI Analyst", self.test_ai_analyst)
+        await self.run_test("Smart Trading Engine", self.test_smart_trading_engine)
         
         # Executor Tests
         print("\n💱 EXECUTOR TESTS")
-        self.run_test("Trade Executor", self.test_trade_executor)
+        await self.run_test("Trade Executor", self.test_trade_executor)
         
         # Monitoring Tests
         print("\n📊 MONITORING TESTS")
-        self.run_test("Monitoring System", self.test_monitoring_system)
+        await self.run_test("Monitoring System", self.test_monitoring_system)
         
         # Integration Tests
         print("\n🔗 INTEGRATION TESTS")
-        self.run_test("Full Workflow Integration", self.test_full_workflow_integration)
-        self.run_test("Pro Features Integration", self.test_pro_features_integration)
+        await self.run_test("Full Workflow Integration", self.test_full_workflow_integration)
+        await self.run_test("Pro Features Integration", self.test_pro_features_integration)
         
         # Error Handling Tests
         print("\n⚠️ ERROR HANDLING TESTS")
-        self.run_test("Error Handling", self.test_error_handling)
+        await self.run_test("Error Handling", self.test_error_handling)
         
         # Print final results
         print("\n" + "=" * 60)
