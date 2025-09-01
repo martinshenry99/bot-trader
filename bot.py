@@ -1120,6 +1120,16 @@ Blacklisted entries are filtered from alerts and trading signals.
         except Exception:
             return False
 
+# Global function for sending messages to users
+async def send_message_to_user(telegram_id: str, message: str):
+    """Send message to user via Telegram"""
+    try:
+        # This would need the bot instance to send messages
+        # For now, log the message that would be sent
+        logger.info(f"Alert for {telegram_id}: {message[:100]}...")
+    except Exception as e:
+        logger.error(f"Failed to send message to {telegram_id}: {e}")
+
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /settings command for trading configuration"""
         user_id = str(update.effective_user.id)
