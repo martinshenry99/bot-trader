@@ -1334,6 +1334,9 @@ def main():
     application.add_handler(CommandHandler("settings", bot.settings_command))
     application.add_handler(CommandHandler("portfolio", bot.portfolio_command))
     
+    # Add basic callback handler for inline keyboards
+    application.add_handler(CallbackQueryHandler(bot.unified_callback_handler))
+    
     # Start the bot
     print('✅ Enhanced Bot is ready and listening for messages!')
     print('🔥 New features: /scan, /leaderboard, /alerts, /watchlist, /blacklist commands')
