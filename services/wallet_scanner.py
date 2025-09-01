@@ -420,6 +420,29 @@ class WalletScanner:
             # Fallback to simple message
             await self._send_simple_alert(telegram_id, signal)
     
+    async def _send_simple_alert(self, telegram_id: str, signal: TradeSignal):
+        """Send simple alert as fallback"""
+        try:
+            from bot import send_message_to_user
+            
+            action_emoji = "🟢" if signal.action == "buy" else "🔴"
+            
+            message = f"""
+{action_emoji} **WALLET ALERT**
+
+**Action:** {signal.action.upper()}
+**Wallet:** `{signal.source_wallet[:8]}...{signal.source_wallet[-6:]}`
+**Token:** `{signal.token_address[:8]}...{signal.token_address[-6:]}`
+**Amount:** ${signal.amount:,.2f}
+**Chain:** {signal.blockchain.upper()}
+**Time:** {signal.timestamp.strftime('%H:%M:%S')}
+            """
+            
+            await send_message_to_user(telegram_id, message)
+            
+        except Exception as e:
+            logger.error(f"Error sending simple alert: {e}")
+    
     def get_action_recommendation(self, signal: TradeSignal) -> str:
         """Get action recommendation based on signal"""
         if signal.action == "sell" and trading_engine.config['mirror_sell_enabled']:
