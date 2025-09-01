@@ -12,3 +12,5 @@ eth-account
 pytest
 pytest-asyncio
 eth-keyfile
+nest-asyncio
+aiohttp
