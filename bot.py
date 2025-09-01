@@ -2118,6 +2118,21 @@ def main():
     
     # Start polling with proper error handling
     try:
+        # Start background services after bot initialization
+        async def start_background_services():
+            """Start background services"""
+            try:
+                from services.wallet_scanner import wallet_scanner
+                await wallet_scanner.start_scanning()
+            except Exception as e:
+                logger.error(f"Failed to start background services: {e}")
+        
+        # Schedule background services to start
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.create_task(start_background_services())
+        
         application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
     except KeyboardInterrupt:
         print('\n⏹️ Bot stopped by user')
