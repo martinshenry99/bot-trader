@@ -1120,6 +1120,7 @@ Blacklisted entries are filtered from alerts and trading signals.
         except Exception:
             return False
 
+
 # Global function for sending messages to users
 async def send_message_to_user(telegram_id: str, message: str):
     """Send message to user via Telegram"""
@@ -1130,6 +1131,10 @@ async def send_message_to_user(telegram_id: str, message: str):
     except Exception as e:
         logger.error(f"Failed to send message to {telegram_id}: {e}")
 
+
+class MemeTraderBotContinuation:
+    """Continuation of MemeTraderBot class methods"""
+    
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /settings command for trading configuration"""
         user_id = str(update.effective_user.id)
