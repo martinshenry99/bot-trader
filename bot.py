@@ -972,19 +972,27 @@ Click buttons below to modify settings:
 **🎯 Active Positions:**
             """
             
+            from utils.formatting import AddressFormatter
+            
             if positions:
-                for i, pos in enumerate(positions[:5]):  # Show top 5 positions
+                for i, pos in enumerate(positions[:5], 1):  # Show top 5 positions
+                    token_address = pos.get('token_address', '')
                     token_symbol = pos.get('token_symbol', 'UNKNOWN')
-                    pnl_pct = pos.get('pnl_percentage', 0)
-                    pnl_usd = pos.get('pnl_usd', 0)
+                    chain = pos.get('chain', 'ethereum')
                     current_value = pos.get('current_value_usd', 0)
+                    pnl_usd = pos.get('pnl_usd', 0)
+                    pnl_pct = pos.get('pnl_percentage', 0)
                     
-                    pnl_emoji = "🟢" if pnl_usd >= 0 else "🔴"
-                    pnl_sign = "+" if pnl_usd >= 0 else ""
+                    position_text = AddressFormatter.format_portfolio_position(
+                        token_address=token_address,
+                        token_symbol=token_symbol,
+                        chain=chain,
+                        current_value=current_value,
+                        pnl_usd=pnl_usd,
+                        pnl_pct=pnl_pct
+                    )
                     
-                    portfolio_message += f"\n{i+1}. **{token_symbol}**"
-                    portfolio_message += f"\n   Value: ${current_value:,.2f}"
-                    portfolio_message += f"\n   P&L: {pnl_emoji} {pnl_sign}${pnl_usd:,.2f} ({pnl_sign}{pnl_pct:.1f}%)"
+                    portfolio_message += f"\n{i}. {position_text}"
                 
                 if len(positions) > 5:
                     portfolio_message += f"\n\n... and {len(positions) - 5} more positions"
