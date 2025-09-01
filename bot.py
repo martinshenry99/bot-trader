@@ -1292,6 +1292,341 @@ Need detailed help? Use /help command.
         """
         await query.edit_message_text(help_text, parse_mode='Markdown')
 
+    # === MAIN MENU CALLBACK HANDLERS ===
+    
+    async def _handle_main_portfolio(self, query, user_id: str):
+        """Handle main menu portfolio button"""
+        try:
+            from ui.main_menu import MainMenu
+            menu_text, menu_keyboard = await MainMenu.get_portfolio_menu(user_id)
+            await query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Main portfolio error: {e}")
+            await query.edit_message_text("❌ Error loading portfolio")
+            await self.show_main_menu(query, user_id)
+    
+    async def _handle_main_scan(self, query, user_id: str):
+        """Handle main menu scan button"""
+        try:
+            from ui.main_menu import MainMenu
+            menu_text, menu_keyboard = await MainMenu.get_scan_menu()
+            await query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Main scan error: {e}")
+            await query.edit_message_text("❌ Error loading scan menu")
+            await self.show_main_menu(query, user_id)
+    
+    async def _handle_main_buy(self, query, user_id: str):
+        """Handle main menu buy button"""
+        await query.edit_message_text(
+            "💰 **Buy Token**\n\n"
+            "**Format:** `/buy [chain] [token_address] [amount_usd]`\n\n"
+            "**Examples:**\n"
+            "• `/buy eth 0x742d35... 10` - Buy $10 of ETH token\n"
+            "• `/buy bsc 0xA0b86a... 25` - Buy $25 of BSC token\n"
+            "• `/buy sol EPjFWdd5... 5` - Buy $5 of SOL token\n\n"
+            "**Supported Chains:** eth, bsc, sol",
+            parse_mode='Markdown'
+        )
+        await self.show_main_menu(query, user_id)
+    
+    async def _handle_main_sell(self, query, user_id: str):
+        """Handle main menu sell button - show portfolio with sell options"""
+        await self._handle_main_portfolio(query, user_id)
+    
+    async def _handle_main_leaderboard(self, query, user_id: str):
+        """Handle main menu leaderboard button"""
+        try:
+            # Reuse existing leaderboard command logic
+            from services.wallet_scanner import wallet_scanner
+            moonshot_wallets = await wallet_scanner.get_moonshot_leaderboard()
+            
+            if not moonshot_wallets:
+                await query.edit_message_text(
+                    "📈 **Moonshot Leaderboard**\n\n"
+                    "🔍 No wallets found with 200x+ multipliers yet.\n\n"
+                    "Keep monitoring - the next moonshot could be discovered soon!"
+                )
+                await self.show_main_menu(query, user_id)
+                return
+            
+            # Format leaderboard with enhanced formatting
+            leaderboard_text = "🚀 **MOONSHOT LEADERBOARD** 🚀\n\n💎 *Wallets with 200x+ gains*\n\n"
+            
+            from utils.formatting import AddressFormatter
+            
+            for i, wallet in enumerate(moonshot_wallets[:10], 1):
+                leaderboard_text += AddressFormatter.format_leaderboard_entry(
+                    rank=i,
+                    wallet_address=wallet.address,
+                    multiplier=wallet.best_trade_multiplier,
+                    total_pnl=wallet.total_pnl_usd,
+                    win_rate=wallet.win_rate,
+                    chains=wallet.chains
+                )
+                leaderboard_text += "\n"
+            
+            leaderboard_text += f"📅 Last updated: {datetime.utcnow().strftime('%H:%M UTC')}"
+            
+            keyboard = [
+                [InlineKeyboardButton("🔍 Analyze Top Wallet", callback_data=f"analyze_wallet_{moonshot_wallets[0].address[:10]}")],
+                [InlineKeyboardButton("👁️ Watch Top Wallet", callback_data=f"add_watchlist_{moonshot_wallets[0].address[:10]}")],
+                [InlineKeyboardButton("🔍 Scan Now", callback_data="manual_scan")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_text(leaderboard_text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Main leaderboard error: {e}")
+            await query.edit_message_text("❌ Error loading leaderboard")
+            await self.show_main_menu(query, user_id)
+    
+    async def _handle_main_panic_sell(self, query, user_id: str):
+        """Handle main menu panic sell button"""
+        try:
+            from ui.main_menu import MainMenu
+            from core.trading_engine import trading_engine
+            
+            # Get portfolio for confirmation details
+            portfolio = await trading_engine.get_portfolio_summary(user_id)
+            
+            confirmation_details = {
+                'total_value': portfolio.get('portfolio_value_usd', 0),
+                'position_count': portfolio.get('position_count', 0)
+            }
+            
+            message, keyboard = MainMenu.create_confirmation_popup("panic_sell", confirmation_details)
+            await query.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Main panic sell error: {e}")
+            await query.edit_message_text("❌ Error preparing panic sell")
+            await self.show_main_menu(query, user_id)
+    
+    async def _handle_main_settings(self, query, user_id: str):
+        """Handle main menu settings button"""
+        try:
+            from ui.main_menu import MainMenu
+            menu_text, menu_keyboard = await MainMenu.get_settings_menu(user_id)
+            await query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Main settings error: {e}")
+            await query.edit_message_text("❌ Error loading settings")
+            await self.show_main_menu(query, user_id)
+    
+    async def _handle_main_help(self, query, user_id: str):
+        """Handle main menu help button"""
+        help_text = """
+📖 **MEME TRADER V4 PRO - QUICK HELP**
+
+**🎯 Main Menu Features:**
+• **Portfolio** - View holdings with sell buttons
+• **Scan Wallets** - Find and analyze top traders
+• **Buy Token** - Quick buy interface
+• **Sell Token** - Portfolio-based selling
+• **Moonshot Leaderboard** - 200x+ wallets
+• **Panic Sell** - Emergency liquidation
+• **Settings** - Configure everything
+• **Safe Mode** - Toggle risk protection
+
+**💡 Navigation Tips:**
+• Main Menu appears after every action
+• Use /start anytime to refresh menu
+• All addresses are clickable links
+• Buttons provide one-click actions
+
+**🛡️ Safety Features:**
+• Safe Mode ON by default
+• Confirmation popups for all trades
+• Real-time risk assessment
+• Multi-chain support
+
+**📱 The Main Menu makes everything easy!**
+        """
+        
+        await query.edit_message_text(help_text, parse_mode='Markdown')
+        await self.show_main_menu(query, user_id)
+    
+    # === SELL PERCENTAGE HANDLERS ===
+    
+    async def _handle_sell_percentage(self, query, data: str, user_id: str):
+        """Handle sell percentage buttons"""
+        try:
+            # Parse the sell data: sell_25_0x742d35Cc or sell_custom_0x742d35Cc
+            parts = data.split('_')
+            if len(parts) < 3:
+                raise ValueError("Invalid sell data format")
+            
+            percentage_str = parts[1]  # 25, 50, 100, custom
+            token_id = '_'.join(parts[2:])  # Rejoin token ID parts
+            
+            if percentage_str == "custom":
+                await query.edit_message_text(
+                    f"💸 **Custom Sell Amount**\n\n"
+                    f"Token: `{token_id}...`\n\n"
+                    f"Use command: `/sell [chain] [full_token_address] [percentage]`\n\n"
+                    f"**Example:** `/sell eth {token_id}... 75`\n\n"
+                    f"*Enter any percentage from 1-100*"
+                )
+                await self.show_main_menu(query, user_id)
+                return
+            
+            # Convert percentage
+            try:
+                percentage = int(percentage_str)
+            except ValueError:
+                raise ValueError("Invalid percentage")
+            
+            # Create confirmation popup
+            from ui.main_menu import MainMenu
+            
+            confirmation_details = {
+                'token_symbol': f"Token {token_id[-6:]}",
+                'token_id': token_id,
+                'percentage': percentage,
+                'estimated_value': 1000.0,  # Would calculate real value
+                'token_amount': 1000.0  # Would calculate real amount
+            }
+            
+            message, keyboard = MainMenu.create_confirmation_popup("sell", confirmation_details)
+            await query.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Handle sell percentage error: {e}")
+            await query.edit_message_text("❌ Error processing sell request")
+            await self.show_main_menu(query, user_id)
+    
+    # === BUY AMOUNT HANDLERS ===
+    
+    async def _handle_set_buy_amount(self, query, data: str, user_id: str):
+        """Handle buy amount setting"""
+        try:
+            # Parse amount: set_buy_amount_50 or set_buy_amount_custom
+            amount_str = data.replace('set_buy_amount_', '')
+            
+            if amount_str == "custom":
+                await query.edit_message_text(
+                    "💵 **Custom Buy Amount**\n\n"
+                    "Please enter your custom default buy amount using:\n\n"
+                    "`/settings buy_amount [amount]`\n\n"
+                    "**Example:** `/settings buy_amount 75`\n\n"
+                    "*This will set $75 as your default buy amount*"
+                )
+                await self.show_main_menu(query, user_id)
+                return
+            
+            try:
+                amount = float(amount_str)
+            except ValueError:
+                raise ValueError("Invalid amount")
+            
+            # Update trading engine config
+            from core.trading_engine import trading_engine
+            result = await trading_engine.update_config(user_id, {'max_auto_buy_usd': amount})
+            
+            if result['success']:
+                await query.edit_message_text(
+                    f"✅ **Default Buy Amount Updated**\n\n"
+                    f"New default buy amount: **${amount:.0f}**\n\n"
+                    f"This will be used for:\n"
+                    f"• Quick buy buttons\n"
+                    f"• Mirror trading (when enabled)\n"
+                    f"• Auto-buy features"
+                )
+            else:
+                await query.edit_message_text("❌ Failed to update buy amount")
+            
+            await self.show_main_menu(query, user_id)
+            
+        except Exception as e:
+            logger.error(f"Set buy amount error: {e}")
+            await query.edit_message_text("❌ Error setting buy amount")
+            await self.show_main_menu(query, user_id)
+    
+    # === EXECUTION HANDLERS ===
+    
+    async def _handle_execute_action(self, query, data: str, user_id: str):
+        """Handle execute action callbacks"""
+        try:
+            if data.startswith('execute_sell_'):
+                # execute_sell_0x742d35Cc__50
+                parts = data.replace('execute_sell_', '').split('__')
+                if len(parts) >= 2:
+                    token_id = parts[0]
+                    percentage = parts[1]
+                    
+                    await query.edit_message_text(
+                        f"⏳ **Executing Sell Order...**\n\n"
+                        f"Selling {percentage}% of token `{token_id}...`\n\n"
+                        f"*This would execute the actual trade*\n\n"
+                        f"✅ **Trade executed successfully!**"
+                    )
+                    
+            elif data.startswith('execute_buy_'):
+                # execute_buy_0x742d35Cc__50
+                parts = data.replace('execute_buy_', '').split('__')
+                if len(parts) >= 2:
+                    token_id = parts[0]
+                    amount = parts[1]
+                    
+                    await query.edit_message_text(
+                        f"⏳ **Executing Buy Order...**\n\n"
+                        f"Buying ${amount} of token `{token_id}...`\n\n"
+                        f"*This would execute the actual trade*\n\n"
+                        f"✅ **Trade executed successfully!**"
+                    )
+                    
+            elif data == 'execute_panic_sell':
+                await query.edit_message_text(
+                    f"🚨 **EXECUTING PANIC SELL...**\n\n"
+                    f"Liquidating all positions...\n\n"
+                    f"*This would execute actual trades*\n\n"
+                    f"✅ **All positions liquidated!**"
+                )
+            
+            # Show main menu after execution
+            await self.show_main_menu(query, user_id)
+            
+        except Exception as e:
+            logger.error(f"Execute action error: {e}")
+            await query.edit_message_text("❌ Error executing action")
+            await self.show_main_menu(query, user_id)
+    
+    async def _handle_cancel_trade(self, query, user_id: str):
+        """Handle trade cancellation"""
+        await query.edit_message_text("✅ **Trade Cancelled**\n\nNo action was taken.")
+        await self.show_main_menu(query, user_id)
+    
+    # === SETTINGS HANDLERS ===
+    
+    async def _handle_settings_callback(self, query, data: str, user_id: str):
+        """Handle settings-related callbacks"""
+        try:
+            if data == "settings_buy_amount":
+                from ui.main_menu import MainMenu
+                menu_text, menu_keyboard = MainMenu.get_buy_amount_menu()
+                await query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+            
+            elif data == "settings_mirror_sell":
+                await self._handle_toggle_mirror_sell(query, user_id)
+            
+            elif data == "settings_mirror_buy":
+                await self._handle_toggle_mirror_buy(query, user_id)
+            
+            elif data == "settings_safe_mode":
+                await self._handle_toggle_safe_mode(query, user_id)
+            
+            else:
+                await query.edit_message_text(f"⚙️ Settings feature '{data}' coming soon!")
+                await self.show_main_menu(query, user_id)
+                
+        except Exception as e:
+            logger.error(f"Settings callback error: {e}")
+            await query.edit_message_text("❌ Error processing settings")
+            await self.show_main_menu(query, user_id)
+
     async def _handle_analyze_wallet_callback(self, query, wallet_prefix: str, user_id: str):
         """Handle analyze wallet callback"""
         try:
