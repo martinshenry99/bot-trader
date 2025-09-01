@@ -6,7 +6,7 @@ from typing import Dict
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from config import Config
-from db import create_tables, get_db_session, User, Wallet, Token, Trade, AlertConfig
+from db import create_tables, get_db_session, User, Wallet, Token, Trade, AlertConfig, BlacklistEntry, WalletWatch
 from monitor import EnhancedMonitoringManager
 from analyzer import EnhancedTokenAnalyzer
 from executor import AdvancedTradeExecutor, KeystoreManager
