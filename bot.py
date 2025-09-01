@@ -268,6 +268,221 @@ Need specific help? Just ask! 🤖
             await loading_msg.edit_text(f"❌ **Buy Analysis Failed**\n\nError: {str(e)}")
 
     async def sell_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /sell command with P&L tracking and token selection"""
+        user_id = str(update.effective_user.id)
+        
+        # If no arguments, show token selection
+        if len(context.args) == 0:
+            await self._show_token_selection_for_sell(update, user_id)
+            return
+        
+        if len(context.args) < 3:
+            await update.message.reply_text(
+                "💸 **Sell Token Command**\n\n"
+                "**Usage:** `/sell [chain] [token_address] [percentage]`\n\n"
+                "**Examples:**\n"
+                "• `/sell eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 50` (sell 50%)\n"
+                "• `/sell bsc 0xA0b86a33E6441ba0BB7e1ae5E3e7BAaD5D1D7e3c 100` (sell all)\n\n"
+                "**Or just use `/sell` to see your holdings and choose what to sell.**\n\n"
+                "**Parameters:**\n"
+                "• `percentage` - Percentage of holdings to sell (1-100)\n\n"
+                "**Features:**\n"
+                "✅ Real-time P&L calculation\n"
+                "✅ Tax optimization strategies\n"
+                "✅ Gas optimization & timing\n"
+                "✅ Slippage protection\n"
+                "✅ Performance tracking",
+                parse_mode='Markdown'
+            )
+            return
+        
+        chain = context.args[0].lower()
+        token_address = context.args[1]
+        
+        try:
+            percentage = float(context.args[2])
+        except ValueError:
+            await update.message.reply_text("❌ Invalid percentage. Please enter a numeric value.")
+            return
+        
+        if percentage <= 0 or percentage > 100:
+            await update.message.reply_text("❌ Percentage must be between 1 and 100.")
+            return
+        
+        # Validate chain
+        if chain not in ['eth', 'bsc', 'sol']:
+            await update.message.reply_text("❌ Unsupported chain. Use 'eth', 'bsc', or 'sol'.")
+            return
+        
+        # Show loading message with enhanced info
+        loading_msg = await update.message.reply_text("🔄 **Analyzing holdings & preparing sell order...**\n\n"
+                                                    "⏳ Calculating:\n"
+                                                    "• Current token balance & USD value\n"
+                                                    "• Real-time P&L analysis\n"
+                                                    "• Optimal sell strategy & timing\n"
+                                                    "• Gas estimation & optimization\n\n"
+                                                    "This may take 10-15 seconds...")
+        
+        try:
+            # Perform pre-sell analysis with enhanced USD calculations
+            analysis_result = await self.perform_pre_trade_analysis(token_address, chain, percentage, 'sell')
+            
+            if not analysis_result['success']:
+                await loading_msg.edit_text(f"❌ **Pre-sell Analysis Failed**\n\n{analysis_result['error']}")
+                return
+            
+            # Create trade session
+            session_id = f"{user_id}_{token_address}_{int(asyncio.get_event_loop().time())}"
+            self.user_sessions[session_id] = {
+                'user_id': user_id,
+                'action': 'sell',
+                'chain': chain,
+                'token_address': token_address,
+                'percentage': percentage,
+                'analysis': analysis_result,
+                'timestamp': asyncio.get_event_loop().time()
+            }
+            
+            # Show pre-trade confirmation with P&L
+            await self.show_sell_confirmation(loading_msg, analysis_result, session_id)
+            
+        except Exception as e:
+            logger.error(f"Sell command error: {e}")
+            await loading_msg.edit_text(f"❌ **Sell Analysis Failed**\n\nError: {str(e)}")
+
+    async def _show_token_selection_for_sell(self, update: Update, user_id: str):
+        """Show user's token holdings for selection"""
+        try:
+            # Get user's portfolio
+            from core.trading_engine import trading_engine
+            portfolio = await trading_engine.get_portfolio_summary(user_id)
+            
+            if 'error' in portfolio:
+                await update.message.reply_text(f"❌ **Portfolio Error**\n\n{portfolio['error']}")
+                return
+            
+            positions = portfolio.get('positions', [])
+            
+            if not positions:
+                message = """
+💸 **Sell Tokens**
+
+📭 **No Holdings Found**
+
+You don't have any token positions to sell.
+
+**Next Steps:**
+• Use `/buy` to purchase tokens
+• Use /portfolio to check your holdings
+• Use /watchlist to monitor wallets for opportunities
+
+Start building your portfolio with smart buys! 📈
+                """
+                await update.message.reply_text(message, parse_mode='Markdown')
+                return
+            
+            # Format holdings for selection
+            message = f"💸 **Select Token to Sell**\n\n**Your Holdings ({len(positions)} tokens):**\n\n"
+            
+            keyboard = []
+            for i, position in enumerate(positions[:10], 1):  # Show max 10
+                token_symbol = position.get('token_symbol', 'UNKNOWN')
+                current_value = position.get('current_value_usd', 0)
+                pnl_usd = position.get('pnl_usd', 0)
+                pnl_pct = position.get('pnl_percentage', 0)
+                
+                # Format display
+                pnl_emoji = "🟢" if pnl_usd >= 0 else "🔴"
+                pnl_sign = "+" if pnl_usd >= 0 else ""
+                
+                message += f"{i}. **{token_symbol}**\n"
+                message += f"   Value: ${current_value:,.2f}\n"
+                message += f"   P&L: {pnl_emoji} {pnl_sign}${pnl_usd:,.2f} ({pnl_sign}{pnl_pct:.1f}%)\n\n"
+                
+                # Add button for this token
+                token_address = position.get('token_address', '')
+                keyboard.append([InlineKeyboardButton(
+                    f"💸 Sell {token_symbol}", 
+                    callback_data=f"sell_token_{token_address[:10]}_{i}"
+                )])
+            
+            if len(positions) > 10:
+                message += f"... and {len(positions) - 10} more tokens\n\n"
+            
+            message += "**Total Portfolio Value:** ${:,.2f}\n".format(portfolio.get('portfolio_value_usd', 0))
+            message += "\nSelect a token to sell, or use the command format:\n"
+            message += "`/sell [chain] [token_address] [percentage]`"
+            
+            # Add utility buttons
+            keyboard.extend([
+                [InlineKeyboardButton("📊 Full Portfolio", callback_data="view_portfolio")],
+                [InlineKeyboardButton("🚨 Sell All (Panic)", callback_data="panic_sell_confirm")],
+                [InlineKeyboardButton("🔄 Refresh", callback_data="refresh_holdings")]
+            ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Token selection error: {e}")
+            await update.message.reply_text(f"❌ **Selection Error**\n\nFailed to load holdings: {str(e)}")
+
+    async def show_sell_confirmation(self, message, analysis_result: Dict, session_id: str):
+        """Show sell confirmation with P&L details"""
+        try:
+            session = self.user_sessions[session_id]
+            token_address = session['token_address']
+            percentage = session['percentage']
+            chain = session['chain']
+            
+            # Get enhanced P&L information
+            pnl_info = analysis_result.get('pnl_analysis', {})
+            
+            confirmation_text = f"""
+💸 **SELL ORDER CONFIRMATION**
+
+**📊 Trade Details:**
+• **Action:** SELL {percentage}% of holdings
+• **Token:** `{token_address[:8]}...{token_address[-6:]}`
+• **Chain:** {chain.upper()}
+
+**💰 P&L Analysis:**
+• **Current Value:** ${pnl_info.get('current_value_usd', 0):,.2f}
+• **Entry Value:** ${pnl_info.get('entry_value_usd', 0):,.2f}
+• **Total P&L:** {"🟢 +" if pnl_info.get('total_pnl_usd', 0) >= 0 else "🔴 "}${pnl_info.get('total_pnl_usd', 0):,.2f}
+• **P&L %:** {pnl_info.get('pnl_percentage', 0):+.1f}%
+
+**🔥 Trade Impact:**
+• **Sell Amount:** {pnl_info.get('sell_amount_tokens', 0):,.4f} tokens
+• **Est. USD Received:** ${pnl_info.get('estimated_usd_received', 0):,.2f}
+• **Remaining Holdings:** {100-percentage:.1f}%
+
+**⛽ Gas & Fees:**
+• **Estimated Gas:** ${analysis_result.get('gas_cost_usd', 0):.2f}
+• **Network:** {chain.upper()}
+• **Slippage:** {analysis_result.get('slippage', 0.01)*100:.1f}%
+
+**🎯 PROFIT ANALYSIS:**
+{"🎉 PROFITABLE TRADE" if pnl_info.get('total_pnl_usd', 0) > 0 else "📉 LOSS MAKING TRADE" if pnl_info.get('total_pnl_usd', 0) < 0 else "⚖️ BREAK-EVEN TRADE"}
+
+**Ready to execute this sell order?**
+            """
+            
+            # Create confirmation buttons
+            keyboard = [
+                [InlineKeyboardButton("✅ Execute Sell", callback_data=f"confirm_trade_{session_id}")],
+                [InlineKeyboardButton("🔄 Dry Run First", callback_data=f"dry_run_{session_id}")],
+                [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_trade_{session_id}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await message.edit_text(confirmation_text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Error showing sell confirmation: {e}")
+            await message.edit_text(f"❌ Error displaying sell confirmation: {str(e)}")
+
+    async def sell_command_old(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /sell command with P&L tracking"""
         user_id = str(update.effective_user.id)
         
