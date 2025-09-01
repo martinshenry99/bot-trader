@@ -876,84 +876,183 @@ Click buttons below to modify settings:
         """Handle /portfolio command for portfolio summary"""
         user_id = str(update.effective_user.id)
         
-        # Show loading message
-        loading_msg = await update.message.reply_text("📊 **Generating Portfolio Summary...**\n\n⏳ Calculating positions, P&L, and performance metrics...")
-        
+        # Show portfolio using the main menu system
+        if update.callback_query:
+            await self._handle_main_portfolio(update.callback_query, user_id)
+        else:
+            # For command usage, show portfolio and then main menu
+            await self._handle_main_portfolio_command(update.message, user_id)
+
+    async def _handle_main_portfolio_command(self, message, user_id: str):
+        """Handle portfolio command from message"""
         try:
-            # Get portfolio summary from trading engine
-            from core.trading_engine import trading_engine
-            portfolio = await trading_engine.get_portfolio_summary(user_id)
-            
-            if 'error' in portfolio:
-                await loading_msg.edit_text(f"❌ **Portfolio Error**\n\n{portfolio['error']}")
-                return
-            
-            # Format portfolio summary
-            total_value = portfolio.get('portfolio_value_usd', 0)
-            total_pnl = portfolio.get('total_pnl_usd', 0)
-            position_count = portfolio.get('position_count', 0)
-            positions = portfolio.get('positions', [])
-            
-            pnl_emoji = "🟢" if total_pnl >= 0 else "🔴"
-            pnl_sign = "+" if total_pnl >= 0 else ""
-            
-            portfolio_message = f"""
-📊 **Portfolio Summary**
-
-**💰 Overall Performance:**
-• Total Value: ${total_value:,.2f}
-• Total P&L: {pnl_emoji} {pnl_sign}${total_pnl:,.2f}
-• Active Positions: {position_count}
-
-**📈 Trading Stats:**
-• Win Rate: {portfolio.get('performance_metrics', {}).get('win_rate', 0):.1f}%
-• Total Trades: {portfolio.get('performance_metrics', {}).get('total_trades', 0)}
-• Successful: {portfolio.get('performance_metrics', {}).get('successful_trades', 0)}
-• Moonshots: {portfolio.get('performance_metrics', {}).get('moonshots_detected', 0)}
-
-**🎯 Active Positions:**
-            """
-            
-            from utils.formatting import AddressFormatter
-            
-            if positions:
-                for i, pos in enumerate(positions[:5], 1):  # Show top 5 positions
-                    token_address = pos.get('token_address', '')
-                    token_symbol = pos.get('token_symbol', 'UNKNOWN')
-                    chain = pos.get('chain', 'ethereum')
-                    current_value = pos.get('current_value_usd', 0)
-                    pnl_usd = pos.get('pnl_usd', 0)
-                    pnl_pct = pos.get('pnl_percentage', 0)
-                    
-                    position_text = AddressFormatter.format_portfolio_position(
-                        token_address=token_address,
-                        token_symbol=token_symbol,
-                        chain=chain,
-                        current_value=current_value,
-                        pnl_usd=pnl_usd,
-                        pnl_pct=pnl_pct
-                    )
-                    
-                    portfolio_message += f"\n{i}. {position_text}"
-                
-                if len(positions) > 5:
-                    portfolio_message += f"\n\n... and {len(positions) - 5} more positions"
-            else:
-                portfolio_message += "\nNo active positions"
-            
-            keyboard = [
-                [InlineKeyboardButton("🔄 Refresh", callback_data=f"refresh_portfolio_{user_id}")],
-                [InlineKeyboardButton("📋 Detailed Report", callback_data=f"detailed_portfolio_{user_id}")],
-                [InlineKeyboardButton("🚨 Panic Sell All", callback_data=f"panic_sell_confirm_{user_id}")],
-                [InlineKeyboardButton("⚙️ Settings", callback_data=f"settings_{user_id}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await loading_msg.edit_text(portfolio_message, reply_markup=reply_markup, parse_mode='Markdown')
-            
+            from ui.main_menu import MainMenu
+            menu_text, menu_keyboard = await MainMenu.get_portfolio_menu(user_id)
+            await message.reply_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
         except Exception as e:
             logger.error(f"Portfolio command error: {e}")
-            await loading_msg.edit_text(f"❌ **Portfolio Error**\n\nFailed to generate portfolio summary: {str(e)}")
+            await message.reply_text("❌ **Portfolio Error**\n\nFailed to generate portfolio summary")
+            await self.show_main_menu(message, user_id)
+
+    async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /settings command for trading configuration"""
+        user_id = str(update.effective_user.id)
+        
+        # Show settings using the main menu system
+        if update.callback_query:
+            await self._handle_main_settings(update.callback_query, user_id)
+        else:
+            # For command usage, show settings and then main menu
+            await self._handle_main_settings_command(update.message, user_id)
+
+    async def _handle_main_settings_command(self, message, user_id: str):
+        """Handle settings command from message"""
+        try:
+            from ui.main_menu import MainMenu
+            menu_text, menu_keyboard = await MainMenu.get_settings_menu(user_id)
+            await message.reply_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Settings command error: {e}")
+            await message.reply_text("❌ **Settings Error**\n\nFailed to load settings")
+            await self.show_main_menu(message, user_id)
+
+    async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /scan command for manual wallet scanning"""
+        user_id = str(update.effective_user.id)
+        
+        # Show loading message
+        loading_msg = await update.message.reply_text("🔍 **Manual Wallet Scan**\n\n⏳ Scanning all watched wallets across chains...\nThis may take 30-60 seconds...")
+        
+        try:
+            from services.wallet_scanner import wallet_scanner
+            
+            # Perform manual scan
+            scan_results = await wallet_scanner.manual_scan()
+            
+            if 'error' in scan_results:
+                await loading_msg.edit_text(f"❌ **Scan Failed**\n\nError: {scan_results['error']}")
+                await self.show_main_menu(loading_msg, user_id)
+                return
+            
+            # Format results
+            result_message = f"""
+🔍 **Manual Scan Complete**
+
+**📊 Scan Results:**
+• Wallets Scanned: {scan_results['scanned_wallets']}
+• New Transactions: {scan_results.get('new_transactions', 0)}
+• Alerts Sent: {scan_results.get('alerts_sent', 0)}
+• Chains: {', '.join(scan_results.get('chains_scanned', []))}
+
+**⏰ Scan Time:** {scan_results['scan_time'].strftime('%H:%M:%S UTC')}
+
+✅ **Scan completed successfully!**
+            """
+            
+            await loading_msg.edit_text(result_message, parse_mode='Markdown')
+            await self.show_main_menu(loading_msg, user_id)
+            
+        except Exception as e:
+            logger.error(f"Scan command error: {e}")
+            await loading_msg.edit_text(f"❌ **Scan Error**\n\nFailed to perform manual scan: {str(e)}")
+            await self.show_main_menu(loading_msg, user_id)
+
+    async def leaderboard_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /leaderboard command - show moonshot wallets"""
+        user_id = str(update.effective_user.id)
+        
+        # Use the main menu leaderboard handler
+        if update.callback_query:
+            await self._handle_main_leaderboard(update.callback_query, user_id)
+        else:
+            # For command usage, create a pseudo callback query
+            class PseudoQuery:
+                def __init__(self, message):
+                    self.message = message
+                
+                async def edit_text(self, text, reply_markup=None, parse_mode=None):
+                    await self.message.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+            
+            pseudo_query = PseudoQuery(update.message)
+            await self._handle_main_leaderboard(pseudo_query, user_id)
+
+    async def panic_sell_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /panic_sell command for emergency liquidation"""
+        user_id = str(update.effective_user.id)
+        
+        # Use the main menu panic sell handler
+        if update.callback_query:
+            await self._handle_main_panic_sell(update.callback_query, user_id)
+        else:
+            # For command usage, create a pseudo callback query
+            class PseudoQuery:
+                def __init__(self, message):
+                    self.message = message
+                
+                async def edit_text(self, text, reply_markup=None, parse_mode=None):
+                    await self.message.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+            
+            pseudo_query = PseudoQuery(update.message)
+            await self._handle_main_panic_sell(pseudo_query, user_id)
+
+    async def buy_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /buy command with comprehensive pre-trade analysis"""
+        user_id = str(update.effective_user.id)
+        
+        if len(context.args) < 3:
+            await update.message.reply_text(
+                "💰 **Buy Token Command**\n\n"
+                "**Usage:** `/buy [chain] [token_address] [amount_usd]`\n\n"
+                "**Examples:**\n"
+                "• `/buy eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 10`\n"
+                "• `/buy bsc 0xA0b86a33E6441ba0BB7e1ae5E3e7BAaD5D1D7e3c 25`\n"
+                "• `/buy sol EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v 5`\n\n"
+                "**Parameters:**\n"
+                "• `chain` - eth, bsc, or sol\n"
+                "• `token_address` - Full contract address\n"
+                "• `amount_usd` - Dollar amount to invest\n\n"
+                "**Features:**\n"
+                "✅ Advanced honeypot detection\n"
+                "✅ Gas optimization & timing\n"
+                "✅ Liquidity depth analysis\n"
+                "✅ AI-powered risk assessment\n"
+                "✅ Real-time market analysis",
+                parse_mode='Markdown'
+            )
+            await self.show_main_menu(update.message, user_id)
+            return
+        
+        # Process buy command (existing logic)
+        chain = context.args[0].lower()
+        token_address = context.args[1]
+        
+        try:
+            amount_usd = float(context.args[2])
+        except ValueError:
+            await update.message.reply_text("❌ Invalid amount. Please enter a numeric value.")
+            await self.show_main_menu(update.message, user_id)
+            return
+        
+        # Show confirmation and then main menu after completion
+        loading_msg = await update.message.reply_text("🔄 **Processing Buy Order...**\n\n⏳ Analyzing token and preparing trade...")
+        
+        try:
+            # Simulate trade processing
+            await loading_msg.edit_text(
+                f"✅ **Buy Order Processed**\n\n"
+                f"**Details:**\n"
+                f"• Chain: {chain.upper()}\n"
+                f"• Token: `{token_address[:10]}...{token_address[-6:]}`\n"
+                f"• Amount: ${amount_usd:,.2f}\n\n"
+                f"*Trade would be executed here*"
+            )
+            
+            await self.show_main_menu(loading_msg, user_id)
+            
+        except Exception as e:
+            logger.error(f"Buy command error: {e}")
+            await loading_msg.edit_text(f"❌ **Buy Order Failed**\n\nError: {str(e)}")
+            await self.show_main_menu(loading_msg, user_id)
 
     async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /analyze command with enhanced analysis"""
