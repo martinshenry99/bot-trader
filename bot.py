@@ -2073,10 +2073,8 @@ def main():
     # Create database tables
     create_tables()
     
-    # Start wallet scanner service
-    print('🔍 Starting wallet scanner service...')
-    from services.wallet_scanner import wallet_scanner
-    asyncio.create_task(wallet_scanner.start_scanning())
+    # Start background services
+    print('🔍 Starting background services...')
     
     # Create application and bot instance
     application = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
