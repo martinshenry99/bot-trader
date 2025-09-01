@@ -1148,8 +1148,7 @@ def main():
     application.add_handler(CommandHandler("portfolio", bot.portfolio_command))
     
     # Add callback handler for inline keyboards
-    application.add_handler(CallbackQueryHandler(bot.handle_callback_query))
-    application.add_handler(CallbackQueryHandler(bot.button_handler))
+    application.add_handler(CallbackQueryHandler(bot.unified_callback_handler))
     
     # Add error handler
     application.add_error_handler(bot.error_handler)
