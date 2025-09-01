@@ -360,6 +360,294 @@ This action is irreversible and should only be used in extreme situations.
         
         await update.message.reply_text(warning_message, reply_markup=reply_markup, parse_mode='Markdown')
 
+    async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /scan command for manual wallet scanning"""
+        user_id = str(update.effective_user.id)
+        
+        # Show loading message
+        loading_msg = await update.message.reply_text("🔍 **Manual Wallet Scan**\n\n⏳ Scanning all watched wallets across chains...\nThis may take 30-60 seconds...")
+        
+        try:
+            from services.wallet_scanner import wallet_scanner
+            
+            # Perform manual scan
+            scan_results = await wallet_scanner.manual_scan()
+            
+            if 'error' in scan_results:
+                await loading_msg.edit_text(f"❌ **Scan Failed**\n\nError: {scan_results['error']}")
+                return
+            
+            # Format results
+            result_message = f"""
+🔍 **Manual Scan Complete**
+
+**📊 Scan Results:**
+• Wallets Scanned: {scan_results['scanned_wallets']}
+• New Transactions: {scan_results.get('new_transactions', 0)}
+• Alerts Sent: {scan_results.get('alerts_sent', 0)}
+• Chains: {', '.join(scan_results.get('chains_scanned', []))}
+
+**⏰ Scan Time:** {scan_results['scan_time'].strftime('%H:%M:%S UTC')}
+
+**Next Steps:**
+• Monitor alerts for trading signals
+• Use /leaderboard to see top wallets
+• Configure /alerts for custom filtering
+
+Automatic scanning continues in background every 30 seconds.
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("📈 View Leaderboard", callback_data="leaderboard")],
+                [InlineKeyboardButton("⚙️ Configure Alerts", callback_data="configure_alerts")],
+                [InlineKeyboardButton("👁️ Watchlist", callback_data="view_watchlist")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await loading_msg.edit_text(result_message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Scan command error: {e}")
+            await loading_msg.edit_text(f"❌ **Scan Error**\n\nFailed to perform manual scan: {str(e)}")
+
+    async def leaderboard_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /leaderboard command - show moonshot wallets"""
+        user_id = str(update.effective_user.id)
+        
+        # Show loading message
+        loading_msg = await update.message.reply_text("📈 **Loading Moonshot Leaderboard...**\n\n🔍 Finding wallets with 200x+ gains...")
+        
+        try:
+            from services.wallet_scanner import wallet_scanner
+            
+            # Get moonshot wallets
+            moonshot_wallets = await wallet_scanner.get_moonshot_leaderboard()
+            
+            if not moonshot_wallets:
+                await loading_msg.edit_text("📈 **Moonshot Leaderboard**\n\n🔍 No wallets found with 200x+ multipliers yet.\n\nKeep monitoring - the next moonshot could be discovered soon!")
+                return
+            
+            # Format leaderboard
+            leaderboard_text = "🚀 **MOONSHOT LEADERBOARD** 🚀\n\n💎 *Wallets with 200x+ gains*\n\n"
+            
+            for i, wallet in enumerate(moonshot_wallets[:10], 1):
+                # Medal emojis for top 3
+                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+                
+                # Format multiplier
+                multiplier_str = f"{wallet.best_trade_multiplier:.0f}x" if wallet.best_trade_multiplier >= 10 else f"{wallet.best_trade_multiplier:.1f}x"
+                
+                # Format PnL
+                pnl_str = f"${wallet.total_pnl_usd/1000000:.1f}M" if wallet.total_pnl_usd >= 1000000 else f"${wallet.total_pnl_usd/1000:.0f}K"
+                
+                # Wallet display
+                wallet_display = f"{wallet.address[:6]}...{wallet.address[-4:]}"
+                
+                leaderboard_text += f"{medal} **{wallet_display}**\n"
+                leaderboard_text += f"   💰 Best: {multiplier_str} | Total: {pnl_str}\n"
+                leaderboard_text += f"   📊 Win Rate: {wallet.win_rate:.1f}% | Trades: {wallet.total_trades}\n"
+                leaderboard_text += f"   🔗 Chains: {', '.join(wallet.chains[:2])}\n\n"
+            
+            leaderboard_text += f"📅 Last updated: {datetime.utcnow().strftime('%H:%M UTC')}\n"
+            leaderboard_text += "🔄 Updates every 30 seconds with new discoveries"
+            
+            keyboard = [
+                [InlineKeyboardButton("👁️ Watch Top Wallet", callback_data=f"watch_wallet_{moonshot_wallets[0].address}")],
+                [InlineKeyboardButton("🔍 Scan Now", callback_data="manual_scan")],
+                [InlineKeyboardButton("⚙️ Alert Settings", callback_data="configure_alerts")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await loading_msg.edit_text(leaderboard_text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Leaderboard command error: {e}")
+            await loading_msg.edit_text(f"❌ **Leaderboard Error**\n\nFailed to load moonshot leaderboard: {str(e)}")
+
+    async def alerts_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /alerts command - configure alert filters"""
+        user_id = str(update.effective_user.id)
+        
+        try:
+            # Get current alert configuration
+            db = get_db_session()
+            try:
+                user = db.query(User).filter(User.telegram_id == user_id).first()
+                if not user:
+                    await update.message.reply_text("❌ User not found. Please use /start first.")
+                    return
+                
+                alert_config = db.query(AlertConfig).filter(AlertConfig.user_id == user.id).first()
+                
+                # Create default config if doesn't exist
+                if not alert_config:
+                    alert_config = AlertConfig(
+                        user_id=user.id,
+                        min_trade_size_usd=100.0,
+                        max_alerts_per_hour=20,
+                        monitored_chains="ethereum,bsc,solana",
+                        buy_alerts_enabled=True,
+                        sell_alerts_enabled=True,
+                        moonshot_alerts_enabled=True
+                    )
+                    db.add(alert_config)
+                    db.commit()
+                    db.refresh(alert_config)
+                
+                # Format current settings
+                chains = alert_config.monitored_chains.split(',') if alert_config.monitored_chains else []
+                chains_display = ', '.join([c.upper() for c in chains])
+                
+                settings_message = f"""
+⚙️ **Alert Configuration**
+
+**🔔 Current Settings:**
+• Min Trade Size: ${alert_config.min_trade_size_usd:,.0f}
+• Max Alerts/Hour: {alert_config.max_alerts_per_hour}
+• Monitored Chains: {chains_display}
+
+**📊 Alert Types:**
+• Buy Alerts: {'✅ ON' if alert_config.buy_alerts_enabled else '❌ OFF'}
+• Sell Alerts: {'✅ ON' if alert_config.sell_alerts_enabled else '❌ OFF'}
+• Moonshot Alerts: {'✅ ON' if alert_config.moonshot_alerts_enabled else '❌ OFF'}
+
+**🚫 Filters:**
+• Blacklisted Wallets: {len(alert_config.blacklisted_wallets.split(',')) if alert_config.blacklisted_wallets else 0}
+• Blacklisted Tokens: {len(alert_config.blacklisted_tokens.split(',')) if alert_config.blacklisted_tokens else 0}
+
+**Configure your alert preferences below:**
+                """
+                
+                keyboard = [
+                    [InlineKeyboardButton("💰 Min Trade Size", callback_data=f"set_min_trade_{user_id}")],
+                    [InlineKeyboardButton("🔔 Alert Types", callback_data=f"alert_types_{user_id}")],
+                    [InlineKeyboardButton("🌐 Chains", callback_data=f"set_chains_{user_id}")],
+                    [InlineKeyboardButton("🚫 Blacklist", callback_data=f"manage_blacklist_{user_id}")],
+                    [InlineKeyboardButton("📊 Test Alerts", callback_data=f"test_alerts_{user_id}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(settings_message, reply_markup=reply_markup, parse_mode='Markdown')
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Alerts command error: {e}")
+            await update.message.reply_text(f"❌ **Alert Configuration Error**\n\nFailed to load alert settings: {str(e)}")
+
+    async def blacklist_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /blacklist command - manage blacklisted wallets/tokens"""
+        user_id = str(update.effective_user.id)
+        
+        if len(context.args) == 0:
+            # Show current blacklist
+            await self._show_blacklist(update, user_id)
+            return
+        
+        action = context.args[0].lower()
+        
+        if action == "add" and len(context.args) >= 3:
+            entry_type = context.args[1].lower()  # 'wallet' or 'token'
+            address = context.args[2]
+            reason = ' '.join(context.args[3:]) if len(context.args) > 3 else "Manual addition"
+            
+            if entry_type not in ['wallet', 'token']:
+                await update.message.reply_text("❌ Invalid type. Use 'wallet' or 'token'.")
+                return
+            
+            success = await self._add_to_blacklist(user_id, entry_type, address, reason)
+            
+            if success:
+                await update.message.reply_text(f"✅ Added {entry_type} `{address[:16]}...` to blacklist.\n\nReason: {reason}", parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ Failed to add to blacklist.")
+                
+        elif action == "remove" and len(context.args) >= 2:
+            address = context.args[1]
+            success = await self._remove_from_blacklist(user_id, address)
+            
+            if success:
+                await update.message.reply_text(f"✅ Removed `{address[:16]}...` from blacklist.", parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ Failed to remove from blacklist or not found.")
+                
+        else:
+            help_text = """
+🚫 **Blacklist Management**
+
+**Usage:**
+• `/blacklist` - Show current blacklist
+• `/blacklist add wallet 0x123... [reason]` - Add wallet
+• `/blacklist add token 0xabc... [reason]` - Add token  
+• `/blacklist remove 0x123...` - Remove entry
+
+**Examples:**
+• `/blacklist add wallet 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b Suspicious activity`
+• `/blacklist add token 0xA0b86a33E6441ba0BB7e1ae5E3e7BAaD5D1D7e3c Honeypot detected`
+• `/blacklist remove 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`
+
+Blacklisted entries are filtered from alerts and trading signals.
+            """
+            await update.message.reply_text(help_text, parse_mode='Markdown')
+
+    async def watchlist_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /watchlist command - manage watched wallets"""
+        user_id = str(update.effective_user.id)
+        
+        if len(context.args) == 0:
+            # Show current watchlist
+            await self._show_watchlist(update, user_id)
+            return
+        
+        action = context.args[0].lower()
+        
+        if action == "add" and len(context.args) >= 2:
+            wallet_address = context.args[1]
+            chains = context.args[2].split(',') if len(context.args) > 2 else ['ethereum']
+            wallet_name = ' '.join(context.args[3:]) if len(context.args) > 3 else None
+            
+            # Validate address format
+            if not self._validate_wallet_address(wallet_address):
+                await update.message.reply_text("❌ Invalid wallet address format.")
+                return
+            
+            from services.wallet_scanner import wallet_scanner
+            success = await wallet_scanner.add_wallet_to_watchlist(wallet_address, int(user_id), chains)
+            
+            if success:
+                chains_str = ', '.join([c.upper() for c in chains])
+                await update.message.reply_text(f"✅ Added wallet to watchlist:\n\n**Address:** `{wallet_address}`\n**Chains:** {chains_str}\n**Name:** {wallet_name or 'Unnamed'}\n\nYou'll receive alerts for this wallet's activity.", parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ Failed to add wallet to watchlist.")
+                
+        elif action == "remove" and len(context.args) >= 2:
+            wallet_address = context.args[1]
+            success = await self._remove_from_watchlist(user_id, wallet_address)
+            
+            if success:
+                await update.message.reply_text(f"✅ Removed `{wallet_address[:16]}...` from watchlist.", parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ Failed to remove from watchlist or not found.")
+                
+        else:
+            help_text = """
+👁️ **Watchlist Management**
+
+**Usage:**
+• `/watchlist` - Show current watchlist
+• `/watchlist add 0x123... [chains] [name]` - Add wallet
+• `/watchlist remove 0x123...` - Remove wallet
+
+**Examples:**
+• `/watchlist add 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b ethereum,bsc DefiWhale`
+• `/watchlist add DUSTawucrTsGU8hcqRdHDCbuYhCPADMLM2VcCb8VnFnQ solana SolanaGem`
+• `/watchlist remove 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`
+
+**Supported Chains:** ethereum, bsc, solana
+            """
+            await update.message.reply_text(help_text, parse_mode='Markdown')
+
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /settings command for trading configuration"""
         user_id = str(update.effective_user.id)
