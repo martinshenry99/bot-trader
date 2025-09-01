@@ -1002,11 +1002,54 @@ Click buttons below to modify settings:
         await query.answer()
         
         try:
-            # Handle new advanced callback queries first
-            if data.startswith('panic_sell_confirm_'):
+            # Handle main menu callbacks
+            if data == "main_menu":
+                await self.show_main_menu(query, user_id)
+            elif data == "main_refresh":
+                await self.show_main_menu(query, user_id)
+            elif data == "main_portfolio":
+                await self._handle_main_portfolio(query, user_id)
+            elif data == "main_scan":
+                await self._handle_main_scan(query, user_id)
+            elif data == "main_buy":
+                await self._handle_main_buy(query, user_id)
+            elif data == "main_sell":
+                await self._handle_main_sell(query, user_id)
+            elif data == "main_leaderboard":
+                await self._handle_main_leaderboard(query, user_id)
+            elif data == "main_panic_sell":
+                await self._handle_main_panic_sell(query, user_id)
+            elif data == "main_settings":
+                await self._handle_main_settings(query, user_id)
+            elif data == "main_toggle_safe_mode":
+                await self._handle_toggle_safe_mode(query, user_id)
+            elif data == "main_help":
+                await self._handle_main_help(query, user_id)
+            
+            # Handle sell percentage callbacks
+            elif data.startswith('sell_'):
+                await self._handle_sell_percentage(query, data, user_id)
+            
+            # Handle buy amount settings
+            elif data.startswith('set_buy_amount_'):
+                await self._handle_set_buy_amount(query, data, user_id)
+            
+            # Handle confirmations
+            elif data.startswith('execute_'):
+                await self._handle_execute_action(query, data, user_id)
+            elif data == "cancel_trade":
+                await self._handle_cancel_trade(query, user_id)
+            
+            # Handle settings callbacks
+            elif data.startswith('settings_'):
+                await self._handle_settings_callback(query, data, user_id)
+            
+            # Handle existing advanced callback queries
+            elif data.startswith('panic_sell_confirm_'):
                 await self._handle_panic_sell_confirm(query, user_id)
             elif data.startswith('panic_sell_cancel_'):
                 await query.edit_message_text("✅ Panic sell cancelled. Your positions are safe.")
+                await self.show_main_menu(query, user_id)
             elif data.startswith('toggle_safe_mode_'):
                 await self._handle_toggle_safe_mode(query, user_id)
             elif data.startswith('mirror_settings_'):
@@ -1017,10 +1060,8 @@ Click buttons below to modify settings:
                 await self._handle_toggle_mirror_buy(query, user_id)
             elif data.startswith('view_portfolio_') or data.startswith('refresh_portfolio_'):
                 await self._handle_portfolio_view(query, user_id)
-            elif data.startswith('settings_'):
-                await self.settings_command(update, context)
             
-            # Handle new enhanced action callbacks
+            # Handle enhanced action callbacks
             elif data.startswith('analyze_wallet_'):
                 wallet_prefix = data.replace('analyze_wallet_', '')
                 await self._handle_analyze_wallet_callback(query, wallet_prefix, user_id)
@@ -1040,10 +1081,7 @@ Click buttons below to modify settings:
                 token_prefix = data.replace('quick_buy_', '')
                 await self._handle_quick_buy_callback(query, token_prefix, user_id)
             
-            elif data == 'help':
-                await self._handle_help_callback(query)
-            
-            # Handle existing callback queries
+            # Handle legacy callbacks  
             elif data.startswith("confirm_trade_"):
                 session_id = data.replace("confirm_trade_", "")
                 await self.handle_trade_confirmation(query, session_id)
@@ -1056,38 +1094,46 @@ Click buttons below to modify settings:
             elif data == "buy_token":
                 await query.edit_message_text(
                     "💰 **Buy Token**\n\n"
-                    "Use the `/buy` command to execute buy orders:\n\n"
-                    "**Format:** `/buy [chain] [token_address] [amount_usd]`\n\n"
+                    "Use the Main Menu 'Buy Token' button or:\n"
+                    "`/buy [chain] [token_address] [amount_usd]`\n\n"
                     "**Example:**\n"
                     "`/buy eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 10`",
                     parse_mode='Markdown'
                 )
+                await self.show_main_menu(query, user_id)
             elif data == "sell_token":
                 await query.edit_message_text(
                     "💸 **Sell Token**\n\n"
-                    "Use the `/sell` command to execute sell orders:\n\n"
-                    "**Format:** `/sell [chain] [token_address] [percentage]`\n\n"
+                    "Use the Main Menu 'Sell Token' button or:\n"
+                    "`/sell [chain] [token_address] [percentage]`\n\n"
                     "**Example:**\n"
                     "`/sell eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 50`",
                     parse_mode='Markdown'
                 )
+                await self.show_main_menu(query, user_id)
             elif data == "analyze_token":
                 await query.edit_message_text(
                     "🔍 **Analyze Token**\n\n"
-                    "Use the `/analyze` command for enhanced token analysis:\n\n"
-                    "**Format:** `/analyze [token_address]`\n\n"
+                    "Use the Main Menu 'Scan Wallets' button or:\n"
+                    "`/analyze [token_address]`\n\n"
                     "**Example:**\n"
                     "`/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`",
                     parse_mode='Markdown'
                 )
+                await self.show_main_menu(query, user_id)
             elif data == "view_portfolio":
-                await query.edit_message_text("📊 Loading portfolio... Use /portfolio for detailed view.")
+                await self._handle_main_portfolio(query, user_id)
+            elif data == "separator":
+                # Ignore separator clicks
+                pass
             else:
-                await query.edit_message_text(f"🚧 Feature '{data}' available via commands!\n\nUse /help to see all commands. 🚀")
+                await query.edit_message_text(f"🚧 Feature available via Main Menu!\n\nUse the buttons below for easy navigation. 🚀")
+                await self.show_main_menu(query, user_id)
                 
         except Exception as e:
             logger.error(f"Unified callback handler error: {e}")
             await query.edit_message_text(f"❌ Error processing request: {str(e)}")
+            await self.show_main_menu(query, user_id)
 
     async def _handle_panic_sell_confirm(self, query, user_id: str):
         """Handle panic sell confirmation"""
