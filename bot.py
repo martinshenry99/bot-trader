@@ -663,29 +663,25 @@ Automatic scanning continues in background every 30 seconds.
             # Format leaderboard
             leaderboard_text = "🚀 **MOONSHOT LEADERBOARD** 🚀\n\n💎 *Wallets with 200x+ gains*\n\n"
             
+            from utils.formatting import AddressFormatter
+            
             for i, wallet in enumerate(moonshot_wallets[:10], 1):
-                # Medal emojis for top 3
-                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
-                
-                # Format multiplier
-                multiplier_str = f"{wallet.best_trade_multiplier:.0f}x" if wallet.best_trade_multiplier >= 10 else f"{wallet.best_trade_multiplier:.1f}x"
-                
-                # Format PnL
-                pnl_str = f"${wallet.total_pnl_usd/1000000:.1f}M" if wallet.total_pnl_usd >= 1000000 else f"${wallet.total_pnl_usd/1000:.0f}K"
-                
-                # Wallet display
-                wallet_display = f"{wallet.address[:6]}...{wallet.address[-4:]}"
-                
-                leaderboard_text += f"{medal} **{wallet_display}**\n"
-                leaderboard_text += f"   💰 Best: {multiplier_str} | Total: {pnl_str}\n"
-                leaderboard_text += f"   📊 Win Rate: {wallet.win_rate:.1f}% | Trades: {wallet.total_trades}\n"
-                leaderboard_text += f"   🔗 Chains: {', '.join(wallet.chains[:2])}\n\n"
+                leaderboard_text += AddressFormatter.format_leaderboard_entry(
+                    rank=i,
+                    wallet_address=wallet.address,
+                    multiplier=wallet.best_trade_multiplier,
+                    total_pnl=wallet.total_pnl_usd,
+                    win_rate=wallet.win_rate,
+                    chains=wallet.chains
+                )
+                leaderboard_text += "\n"
             
             leaderboard_text += f"📅 Last updated: {datetime.utcnow().strftime('%H:%M UTC')}\n"
             leaderboard_text += "🔄 Updates every 30 seconds with new discoveries"
             
             keyboard = [
-                [InlineKeyboardButton("👁️ Watch Top Wallet", callback_data=f"watch_wallet_{moonshot_wallets[0].address}")],
+                [InlineKeyboardButton("🔍 Analyze Top Wallet", callback_data=f"analyze_wallet_{moonshot_wallets[0].address[:10]}")],
+                [InlineKeyboardButton("👁️ Watch Top Wallet", callback_data=f"add_watchlist_{moonshot_wallets[0].address[:10]}")],
                 [InlineKeyboardButton("🔍 Scan Now", callback_data="manual_scan")],
                 [InlineKeyboardButton("⚙️ Alert Settings", callback_data="configure_alerts")]
             ]
