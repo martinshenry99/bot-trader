@@ -68,8 +68,11 @@ Hello {user.first_name}! Your advanced cryptocurrency trading assistant is ready
 /buy - Execute buy orders with pre-trade analysis
 /sell - Execute sell orders with profit/loss tracking
 /analyze - Advanced token analysis with honeypot detection
-/wallet - Manage trading wallets & keystore
-/monitor - Enhanced real-time monitoring & alerts
+/scan - Manual wallet scanning across chains
+/leaderboard - View moonshot wallet leaderboard
+/watchlist - Manage watched wallets
+/alerts - Configure alert settings
+/blacklist - Manage blacklisted wallets/tokens
 /portfolio - Advanced portfolio analytics
 /settings - Trading & risk management settings
 
