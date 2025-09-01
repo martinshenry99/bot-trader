@@ -1424,6 +1424,11 @@ def main():
     application.add_handler(CommandHandler("sell", bot.sell_command))
     application.add_handler(CommandHandler("analyze", bot.analyze_command))
     application.add_handler(CommandHandler("panic_sell", bot.panic_sell_command))
+    application.add_handler(CommandHandler("scan", bot.scan_command))
+    application.add_handler(CommandHandler("leaderboard", bot.leaderboard_command))
+    application.add_handler(CommandHandler("alerts", bot.alerts_command))
+    application.add_handler(CommandHandler("blacklist", bot.blacklist_command))
+    application.add_handler(CommandHandler("watchlist", bot.watchlist_command))
     application.add_handler(CommandHandler("settings", bot.settings_command))
     application.add_handler(CommandHandler("portfolio", bot.portfolio_command))
     
