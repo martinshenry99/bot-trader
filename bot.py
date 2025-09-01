@@ -881,6 +881,172 @@ Blacklisted entries are filtered from alerts and trading signals.
             """
             await update.message.reply_text(help_text, parse_mode='Markdown')
 
+    async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /settings command for trading configuration"""
+        user_id = str(update.effective_user.id)
+        
+        # Get current trading engine config
+        from core.trading_engine import trading_engine
+        
+        current_config = {
+            'safe_mode': trading_engine.config['safe_mode'],
+            'mirror_sell_enabled': trading_engine.config['mirror_sell_enabled'],
+            'mirror_buy_enabled': trading_engine.config['mirror_buy_enabled'],
+            'max_auto_buy_usd': trading_engine.config['max_auto_buy_usd'],
+            'max_position_size_usd': trading_engine.config['max_position_size_usd'],
+            'max_slippage': trading_engine.config['max_slippage'] * 100,  # Convert to percentage
+            'min_liquidity_usd': trading_engine.config['min_liquidity_usd']
+        }
+        
+        settings_message = f"""
+⚙️ **Trading Settings & Configuration**
+
+**🛡️ Safety Settings:**
+• Safe Mode: {'✅ ON' if current_config['safe_mode'] else '❌ OFF'}
+• Max Slippage: {current_config['max_slippage']:.1f}%
+• Min Liquidity: ${current_config['min_liquidity_usd']:,.0f}
+
+**🔄 Mirror Trading:**
+• Mirror Sell: {'✅ ON (Auto)' if current_config['mirror_sell_enabled'] else '❌ OFF'}
+• Mirror Buy: {'✅ ON (Auto)' if current_config['mirror_buy_enabled'] else '❌ OFF (Manual)'}
+
+**💰 Position Limits:**
+• Max Auto Buy: ${current_config['max_auto_buy_usd']:.0f}
+• Max Position Size: ${current_config['max_position_size_usd']:,.0f}
+
+**📊 Current Status:**
+• Active Positions: {len(trading_engine.mirror_positions)}
+• Total Trades: {trading_engine.stats['total_trades']}
+• Win Rate: {trading_engine.stats['win_rate']:.1f}%
+• Total P&L: ${trading_engine.stats['total_pnl_usd']:.2f}
+
+Click buttons below to modify settings:
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton("🛡️ Toggle Safe Mode", callback_data=f"toggle_safe_mode_{user_id}")],
+            [InlineKeyboardButton("🔄 Mirror Settings", callback_data=f"mirror_settings_{user_id}")],
+            [InlineKeyboardButton("💰 Position Limits", callback_data=f"position_limits_{user_id}")],
+            [InlineKeyboardButton("📊 View Portfolio", callback_data=f"view_portfolio_{user_id}")],
+            [InlineKeyboardButton("❓ Help", callback_data="help")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(settings_message, reply_markup=reply_markup, parse_mode='Markdown')
+
+    async def portfolio_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /portfolio command for portfolio summary"""
+        user_id = str(update.effective_user.id)
+        
+        # Show loading message
+        loading_msg = await update.message.reply_text("📊 **Generating Portfolio Summary...**\n\n⏳ Calculating positions, P&L, and performance metrics...")
+        
+        try:
+            # Get portfolio summary from trading engine
+            from core.trading_engine import trading_engine
+            portfolio = await trading_engine.get_portfolio_summary(user_id)
+            
+            if 'error' in portfolio:
+                await loading_msg.edit_text(f"❌ **Portfolio Error**\n\n{portfolio['error']}")
+                return
+            
+            # Format portfolio summary
+            total_value = portfolio.get('portfolio_value_usd', 0)
+            total_pnl = portfolio.get('total_pnl_usd', 0)
+            position_count = portfolio.get('position_count', 0)
+            positions = portfolio.get('positions', [])
+            
+            pnl_emoji = "🟢" if total_pnl >= 0 else "🔴"
+            pnl_sign = "+" if total_pnl >= 0 else ""
+            
+            portfolio_message = f"""
+📊 **Portfolio Summary**
+
+**💰 Overall Performance:**
+• Total Value: ${total_value:,.2f}
+• Total P&L: {pnl_emoji} {pnl_sign}${total_pnl:,.2f}
+• Active Positions: {position_count}
+
+**📈 Trading Stats:**
+• Win Rate: {portfolio.get('performance_metrics', {}).get('win_rate', 0):.1f}%
+• Total Trades: {portfolio.get('performance_metrics', {}).get('total_trades', 0)}
+• Successful: {portfolio.get('performance_metrics', {}).get('successful_trades', 0)}
+• Moonshots: {portfolio.get('performance_metrics', {}).get('moonshots_detected', 0)}
+
+**🎯 Active Positions:**
+            """
+            
+            if positions:
+                for i, pos in enumerate(positions[:5]):  # Show top 5 positions
+                    token_symbol = pos.get('token_symbol', 'UNKNOWN')
+                    pnl_pct = pos.get('pnl_percentage', 0)
+                    pnl_usd = pos.get('pnl_usd', 0)
+                    current_value = pos.get('current_value_usd', 0)
+                    
+                    pnl_emoji = "🟢" if pnl_usd >= 0 else "🔴"
+                    pnl_sign = "+" if pnl_usd >= 0 else ""
+                    
+                    portfolio_message += f"\n{i+1}. **{token_symbol}**"
+                    portfolio_message += f"\n   Value: ${current_value:,.2f}"
+                    portfolio_message += f"\n   P&L: {pnl_emoji} {pnl_sign}${pnl_usd:,.2f} ({pnl_sign}{pnl_pct:.1f}%)"
+                
+                if len(positions) > 5:
+                    portfolio_message += f"\n\n... and {len(positions) - 5} more positions"
+            else:
+                portfolio_message += "\nNo active positions"
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Refresh", callback_data=f"refresh_portfolio_{user_id}")],
+                [InlineKeyboardButton("📋 Detailed Report", callback_data=f"detailed_portfolio_{user_id}")],
+                [InlineKeyboardButton("🚨 Panic Sell All", callback_data=f"panic_sell_confirm_{user_id}")],
+                [InlineKeyboardButton("⚙️ Settings", callback_data=f"settings_{user_id}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await loading_msg.edit_text(portfolio_message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Portfolio command error: {e}")
+            await loading_msg.edit_text(f"❌ **Portfolio Error**\n\nFailed to generate portfolio summary: {str(e)}")
+
+    async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /analyze command with enhanced analysis"""
+        if len(context.args) == 0:
+            await update.message.reply_text(
+                "🔍 **Enhanced Token Analysis**\n\n"
+                "**Usage:** `/analyze [token_address]`\n\n"
+                "**Example:**\n"
+                "`/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`\n\n"
+                "**Enhanced Features:**\n"
+                "✅ Advanced honeypot simulation\n"
+                "✅ Multi-scenario trading tests\n"
+                "✅ Contract risk assessment\n"
+                "✅ Liquidity depth analysis\n"
+                "✅ AI-powered scoring (0-10)\n"
+                "✅ Trade safety score\n"
+                "✅ Real-time risk monitoring", 
+                parse_mode='Markdown'
+            )
+            return
+        
+        token_address = context.args[0]
+        loading_msg = await update.message.reply_text("🔄 **Running Enhanced Analysis...**\n\n"
+                                                    "⏳ Comprehensive checks in progress:\n"
+                                                    "• Advanced honeypot simulation\n"
+                                                    "• Contract security analysis\n"
+                                                    "• Trading scenario testing\n"
+                                                    "• AI risk assessment\n"
+                                                    "• Market sentiment analysis\n\n"
+                                                    "This may take 15-20 seconds...")
+        
+        try:
+            analysis = await self.analyzer.analyze_token(token_address)
+            await self.show_enhanced_analysis_results(loading_msg, analysis)
+            
+        except Exception as e:
+            logger.error(f"Enhanced analysis error: {e}")
+            await loading_msg.edit_text(f"❌ **Enhanced Analysis Failed**\n\nError: {str(e)}")
+
     async def _show_blacklist(self, update: Update, user_id: str):
         """Show current blacklist entries"""
         try:
