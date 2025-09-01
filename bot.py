@@ -1151,7 +1151,24 @@ def main():
     print('📡 Real-time monitoring: Mempool tracking, price alerts, portfolio analytics')
     print('🚀 Multi-chain: Ethereum, BSC, and Solana trading with mirror functionality')
     
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Fix asyncio event loop issue
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except ImportError:
+        pass
+    
+    # Start polling with proper error handling
+    try:
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    except KeyboardInterrupt:
+        print('\n⏹️ Bot stopped by user')
+    except Exception as e:
+        print(f'\n❌ Bot error: {e}')
+        # Try alternative startup method
+        import asyncio
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
