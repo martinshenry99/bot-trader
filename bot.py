@@ -1429,12 +1429,20 @@ Need detailed help? Use /help command.
                 else:
                     message = f"👁️ **Your Watchlist** ({len(watched_wallets)} wallets)\n\n"
                     
+                    from utils.formatting import AddressFormatter
+                    
                     for i, wallet in enumerate(watched_wallets[:15], 1):  # Show max 15
-                        address_display = f"{wallet.wallet_address[:8]}...{wallet.wallet_address[-6:]}"
                         chains = wallet.chains.split(',') if wallet.chains else ['ethereum']
-                        chains_display = ', '.join([c.upper() for c in chains[:2]])
+                        main_chain = chains[0]
                         
-                        name = wallet.wallet_name or "Unnamed"
+                        # Enhanced wallet link
+                        wallet_link = AddressFormatter.format_wallet_address(
+                            wallet.wallet_address, 
+                            main_chain, 
+                            wallet.wallet_name or f"Wallet {i}"
+                        )
+                        
+                        chains_display = ', '.join([AddressFormatter.CHAIN_NAMES.get(c.lower(), c.upper()) for c in chains[:2]])
                         
                         # Performance info if available
                         perf_info = ""
@@ -1443,8 +1451,8 @@ Need detailed help? Use /help command.
                         if wallet.best_multiplier and wallet.best_multiplier > 1:
                             perf_info += f" | {wallet.best_multiplier:.1f}x best"
                         
-                        message += f"{i}. **{name}**\n"
-                        message += f"   `{address_display}` | {chains_display}{perf_info}\n"
+                        message += f"{i}. {wallet_link}\n"
+                        message += f"   Chains: {chains_display}{perf_info}\n"
                         
                         if wallet.last_active:
                             days_ago = (datetime.utcnow() - wallet.last_active).days
