@@ -1427,15 +1427,21 @@ Need detailed help? Use /help command.
                 else:
                     message = "🚫 **Your Blacklist**\n\n"
                     
+                    from utils.formatting import AddressFormatter
+                    
                     wallets = [e for e in blacklist_entries if e.entry_type == 'wallet']
                     tokens = [e for e in blacklist_entries if e.entry_type == 'token']
                     
                     if wallets:
                         message += "**👤 Blacklisted Wallets:**\n"
                         for entry in wallets[:10]:  # Show max 10
-                            address_display = f"{entry.address[:8]}...{entry.address[-6:]}"
+                            wallet_link = AddressFormatter.format_wallet_address(
+                                entry.address, 
+                                'ethereum',  # Default chain for display
+                                None
+                            )
                             reason = entry.reason or "No reason"
-                            message += f"• `{address_display}` - {reason}\n"
+                            message += f"• {wallet_link} - {reason}\n"
                         if len(wallets) > 10:
                             message += f"... and {len(wallets) - 10} more\n"
                         message += "\n"
@@ -1443,9 +1449,13 @@ Need detailed help? Use /help command.
                     if tokens:
                         message += "**🪙 Blacklisted Tokens:**\n"
                         for entry in tokens[:10]:  # Show max 10
-                            address_display = f"{entry.address[:8]}...{entry.address[-6:]}"
+                            token_link = AddressFormatter.format_token_address(
+                                entry.address,
+                                'ethereum',  # Default chain for display
+                                None
+                            )
                             reason = entry.reason or "No reason"
-                            message += f"• `{address_display}` - {reason}\n"
+                            message += f"• {token_link} - {reason}\n"
                         if len(tokens) > 10:
                             message += f"... and {len(tokens) - 10} more\n"
                     
