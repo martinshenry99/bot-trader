@@ -1047,6 +1047,238 @@ Click buttons below to modify settings:
             logger.error(f"Enhanced analysis error: {e}")
             await loading_msg.edit_text(f"❌ **Enhanced Analysis Failed**\n\nError: {str(e)}")
 
+    async def unified_callback_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Unified callback handler for all inline keyboard interactions"""
+        query = update.callback_query
+        user_id = str(query.from_user.id)
+        data = query.data
+        
+        await query.answer()
+        
+        try:
+            # Handle new advanced callback queries first
+            if data.startswith('panic_sell_confirm_'):
+                await self._handle_panic_sell_confirm(query, user_id)
+            elif data.startswith('panic_sell_cancel_'):
+                await query.edit_message_text("✅ Panic sell cancelled. Your positions are safe.")
+            elif data.startswith('toggle_safe_mode_'):
+                await self._handle_toggle_safe_mode(query, user_id)
+            elif data.startswith('mirror_settings_'):
+                await self._handle_mirror_settings(query, user_id)
+            elif data.startswith('toggle_mirror_sell_'):
+                await self._handle_toggle_mirror_sell(query, user_id)
+            elif data.startswith('toggle_mirror_buy_'):
+                await self._handle_toggle_mirror_buy(query, user_id)
+            elif data.startswith('view_portfolio_') or data.startswith('refresh_portfolio_'):
+                await self._handle_portfolio_view(query, user_id)
+            elif data.startswith('settings_'):
+                await self.settings_command(update, context)
+            elif data == 'help':
+                await self._handle_help_callback(query)
+            
+            # Handle existing callback queries
+            elif data.startswith("confirm_trade_"):
+                session_id = data.replace("confirm_trade_", "")
+                await self.handle_trade_confirmation(query, session_id)
+            elif data.startswith("dry_run_"):
+                session_id = data.replace("dry_run_", "")
+                await self.handle_dry_run(query, session_id)
+            elif data.startswith("cancel_trade_"):
+                session_id = data.replace("cancel_trade_", "")
+                await self.handle_trade_cancellation(query, session_id)
+            elif data == "buy_token":
+                await query.edit_message_text(
+                    "💰 **Buy Token**\n\n"
+                    "Use the `/buy` command to execute buy orders:\n\n"
+                    "**Format:** `/buy [chain] [token_address] [amount_usd]`\n\n"
+                    "**Example:**\n"
+                    "`/buy eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 10`",
+                    parse_mode='Markdown'
+                )
+            elif data == "sell_token":
+                await query.edit_message_text(
+                    "💸 **Sell Token**\n\n"
+                    "Use the `/sell` command to execute sell orders:\n\n"
+                    "**Format:** `/sell [chain] [token_address] [percentage]`\n\n"
+                    "**Example:**\n"
+                    "`/sell eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 50`",
+                    parse_mode='Markdown'
+                )
+            elif data == "analyze_token":
+                await query.edit_message_text(
+                    "🔍 **Analyze Token**\n\n"
+                    "Use the `/analyze` command for enhanced token analysis:\n\n"
+                    "**Format:** `/analyze [token_address]`\n\n"
+                    "**Example:**\n"
+                    "`/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`",
+                    parse_mode='Markdown'
+                )
+            elif data == "view_portfolio":
+                await query.edit_message_text("📊 Loading portfolio... Use /portfolio for detailed view.")
+            else:
+                await query.edit_message_text(f"🚧 Feature '{data}' available via commands!\n\nUse /help to see all commands. 🚀")
+                
+        except Exception as e:
+            logger.error(f"Unified callback handler error: {e}")
+            await query.edit_message_text(f"❌ Error processing request: {str(e)}")
+
+    async def _handle_panic_sell_confirm(self, query, user_id: str):
+        """Handle panic sell confirmation"""
+        try:
+            await query.edit_message_text("🚨 **EXECUTING PANIC SELL...**\n\nLiquidating all positions. This may take 30-60 seconds...")
+            
+            # Execute panic sell through trading engine
+            from core.trading_engine import trading_engine
+            result = await trading_engine.execute_panic_sell(user_id)
+            
+            if result['success']:
+                liquidated = result.get('liquidated_count', 0)
+                total = result.get('total_positions', 0)
+                
+                success_message = f"""
+✅ **PANIC SELL COMPLETED**
+
+**Results:**
+• Positions Liquidated: {liquidated}/{total}
+• Successful Sales: {liquidated}
+• Failed Sales: {total - liquidated}
+
+**Summary:**
+{result.get('message', 'All positions processed')}
+
+Your portfolio has been liquidated. Check your wallet for received funds.
+                """
+                await query.edit_message_text(success_message, parse_mode='Markdown')
+            else:
+                await query.edit_message_text(f"❌ **PANIC SELL FAILED**\n\nError: {result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            logger.error(f"Panic sell execution error: {e}")
+            await query.edit_message_text(f"❌ **PANIC SELL ERROR**\n\nFailed to execute: {str(e)}")
+
+    async def _handle_toggle_safe_mode(self, query, user_id: str):
+        """Handle safe mode toggle"""
+        try:
+            from core.trading_engine import trading_engine
+            
+            current_mode = trading_engine.config['safe_mode']
+            new_mode = not current_mode
+            
+            result = await trading_engine.update_config(user_id, {'safe_mode': new_mode})
+            
+            if result['success']:
+                mode_text = "ON" if new_mode else "OFF"
+                await query.edit_message_text(f"✅ Safe Mode is now **{mode_text}**\n\nSafe mode {'blocks risky trades automatically' if new_mode else 'allows all trades (use caution)'}")
+            else:
+                await query.edit_message_text("❌ Failed to update safe mode setting")
+                
+        except Exception as e:
+            logger.error(f"Safe mode toggle error: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+    async def _handle_mirror_settings(self, query, user_id: str):
+        """Handle mirror trading settings"""
+        try:
+            from core.trading_engine import trading_engine
+            
+            current_config = trading_engine.config
+            
+            message = f"""
+🔄 **Mirror Trading Settings**
+
+**Current Status:**
+• Mirror Sell: {'✅ ON' if current_config['mirror_sell_enabled'] else '❌ OFF'}
+• Mirror Buy: {'✅ ON' if current_config['mirror_buy_enabled'] else '❌ OFF'}
+
+**Mirror Sell (Recommended: ON):**
+Automatically sells your tokens when tracked wallets sell
+
+**Mirror Buy (Recommended: OFF):**
+Automatically buys tokens when tracked wallets buy (risky)
+
+Choose action:
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Toggle Mirror Sell", callback_data=f"toggle_mirror_sell_{user_id}")],
+                [InlineKeyboardButton("🔄 Toggle Mirror Buy", callback_data=f"toggle_mirror_buy_{user_id}")],
+                [InlineKeyboardButton("⬅️ Back to Settings", callback_data=f"settings_{user_id}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Mirror settings error: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+    async def _handle_toggle_mirror_sell(self, query, user_id: str):
+        """Handle mirror sell toggle"""
+        try:
+            from core.trading_engine import trading_engine
+            
+            current_state = trading_engine.config['mirror_sell_enabled']
+            new_state = not current_state
+            
+            result = await trading_engine.update_config(user_id, {'mirror_sell_enabled': new_state})
+            
+            if result['success']:
+                state_text = "ON" if new_state else "OFF"
+                await query.edit_message_text(f"✅ Mirror Sell is now **{state_text}**\n\n{'Automatic selling when tracked wallets sell' if new_state else 'Manual selling only'}")
+            else:
+                await query.edit_message_text("❌ Failed to update mirror sell setting")
+                
+        except Exception as e:
+            logger.error(f"Mirror sell toggle error: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+    async def _handle_toggle_mirror_buy(self, query, user_id: str):
+        """Handle mirror buy toggle"""
+        try:
+            from core.trading_engine import trading_engine
+            
+            current_state = trading_engine.config['mirror_buy_enabled']
+            new_state = not current_state
+            
+            result = await trading_engine.update_config(user_id, {'mirror_buy_enabled': new_state})
+            
+            if result['success']:
+                state_text = "ON" if new_state else "OFF"
+                warning = "\n\n⚠️ **WARNING:** Auto-buy is risky! Only enable if you trust your tracked wallets." if new_state else ""
+                await query.edit_message_text(f"✅ Mirror Buy is now **{state_text}**\n\n{'Automatic buying when tracked wallets buy' if new_state else 'Manual buy alerts only'}{warning}")
+            else:
+                await query.edit_message_text("❌ Failed to update mirror buy setting")
+                
+        except Exception as e:
+            logger.error(f"Mirror buy toggle error: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+    async def _handle_portfolio_view(self, query, user_id: str):
+        """Handle portfolio view callback"""
+        await query.edit_message_text("📊 Refreshing portfolio... Use /portfolio command for latest data.")
+
+    async def _handle_help_callback(self, query):
+        """Handle help callback"""
+        help_text = """
+🔧 **Meme Trader V4 Pro - Quick Help**
+
+**Main Commands:**
+/buy - Execute buy orders
+/sell - Execute sell orders  
+/panic_sell - Emergency liquidation
+/portfolio - View portfolio summary
+/settings - Trading configuration
+
+**Features:**
+✅ Multi-chain support (ETH, BSC, Solana)
+✅ Mirror trading with risk management
+✅ AI-powered analysis
+✅ Real-time monitoring
+
+Need detailed help? Use /help command.
+        """
+        await query.edit_message_text(help_text, parse_mode='Markdown')
+
     async def _show_blacklist(self, update: Update, user_id: str):
         """Show current blacklist entries"""
         try:
