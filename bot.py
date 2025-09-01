@@ -1633,7 +1633,8 @@ def main():
     
     # Start the bot
     print('✅ Enhanced Bot is ready and listening for messages!')
-    print('🔥 New features: /buy, /sell, /panic_sell, /portfolio, /settings commands')
+    print('🔥 New features: /scan, /leaderboard, /alerts, /watchlist, /blacklist commands')
+    print('💰 Trading: /buy, /sell, /panic_sell, /portfolio, /settings commands')
     print('🛡️  Enhanced security: Honeypot simulation, gas optimization, risk assessment')
     print('📡 Real-time monitoring: Mempool tracking, price alerts, portfolio analytics')
     print('🚀 Multi-chain: Ethereum, BSC, and Solana trading with mirror functionality')
