@@ -82,93 +82,54 @@ class MemeTraderBot:
             logger.error(f"Error ensuring user exists: {e}")
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /help command"""
+        """Handle /help command and return to main menu"""
+        user_id = str(update.effective_user.id)
+        
         help_text = """
-🔧 **Meme Trader V4 Pro Enhanced Commands**
+📖 **MEME TRADER V4 PRO - HELP**
+
+**🎯 Main Features:**
+• **Multi-chain trading** (ETH, BSC, Solana)
+• **Mirror trading** with smart wallet following
+• **Real-time portfolio** tracking in USD
+• **Advanced risk management** and safety controls
+• **Moonshot leaderboard** (200x+ wallets)
 
 **💰 Trading Commands:**
-/buy [chain] [token_address] [amount_usd] - Execute buy order
-• Example: `/buy eth 0x742d35... 10`
-• Supports: eth (Sepolia), bsc (BSC Testnet)
-• Pre-trade honeypot check & gas estimation
+• `/buy [chain] [token] [amount]` - Buy tokens
+• `/sell [chain] [token] [%]` - Sell tokens
+• `/portfolio` - View your positions
+• `/panic_sell` - Emergency liquidation
 
-/sell [chain] [token_address] [percentage] - Execute sell order  
-• Example: `/sell eth 0x742d35... 50`
-• Percentage of holdings to sell (1-100)
-• Profit/loss calculation & tax optimization
+**🔍 Analysis Commands:**
+• `/scan` - Manual wallet scan
+• `/analyze [address]` - Analyze token/wallet
+• `/leaderboard` - View top traders
 
-**🔍 Analysis & Monitoring:**
-/analyze [token_address] - Advanced token analysis
-• Comprehensive honeypot detection
-• AI-powered risk assessment
-• Real-time liquidity & volume analysis
-• Trading safety score (0-10)
+**⚙️ Management Commands:**
+• `/settings` - Configure trading
+• `/watchlist` - Manage watched wallets
+• `/blacklist` - Manage blocked addresses
+• `/alerts` - Configure notifications
 
-/scan - Manual wallet scan across all chains
-• Scan all watched wallets for new transactions
-• Get real-time trading signals and alerts
-• Monitor moonshot opportunities
+**🛡️ Safety Features:**
+• Safe Mode blocks risky trades
+• Mirror-sell enabled by default
+• Mirror-buy disabled for safety
+• Comprehensive risk scoring
 
-/leaderboard - View moonshot wallet leaderboard
-• Top wallets with 200x+ gains
-• Performance metrics and win rates
-• Copy trading opportunities
+**💡 Pro Tips:**
+• Use the Main Menu for easy navigation
+• Enable Safe Mode for beginners
+• Monitor the leaderboard for opportunities
+• Set appropriate position limits
 
-**👁️ Wallet & Alert Management:**
-/watchlist - Manage watched wallets
-• Add/remove wallets to monitor
-• Multi-chain wallet tracking
-• Real-time activity alerts
-
-/alerts - Configure alert settings
-• Set minimum trade size filters
-• Enable/disable alert types
-• Chain-specific monitoring
-
-/blacklist - Manage blacklisted wallets/tokens
-• Block suspicious wallets from alerts
-• Filter out honeypot tokens
-• Custom filtering rules
-
-**📈 Portfolio & Analytics:**
-/portfolio - Advanced portfolio analytics
-• Real-time P&L tracking
-• Performance metrics & charts
-• Risk assessment & diversification
-• AI-powered optimization suggestions
-
-**⚙️ Settings & Configuration:**
-/settings - Trading & risk management
-• Gas settings & slippage tolerance
-• Risk limits & position sizing
-• Alert preferences & thresholds
-• Security & backup settings
-
-**🔥 Pro Features:**
-• Multi-wallet automated strategies
-• AI-guided trade execution
-• Advanced market sentiment analysis
-• Mempool monitoring & early alerts
-• Moonshot wallet discovery
-
-**💡 Command Examples:**
-• Buy: `/buy eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 5`
-• Sell: `/sell eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 25`
-• Analyze: `/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`
-• Watch wallet: `/watchlist add 0x742d35... ethereum,bsc WhaleWallet`
-• Configure alerts: `/alerts`
-
-**🚨 Safety First:**
-All trades include pre-execution checks:
-✅ Honeypot detection & simulation
-✅ Liquidity depth verification
-✅ Gas optimization & estimation
-✅ Slippage protection
-✅ Risk assessment scoring
-
-Need specific help? Just ask! 🤖
+The Main Menu will appear after each action for easy navigation!
         """
+        
+        # Send help and then show main menu
         await update.message.reply_text(help_text, parse_mode='Markdown')
+        await self.show_main_menu(update.message, user_id)
 
     async def buy_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /buy command with enhanced pre-trade checks"""
