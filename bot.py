@@ -1520,12 +1520,13 @@ Need detailed help? Use /help command.
 
 
 # Global function for sending messages to users
-async def send_message_to_user(telegram_id: str, message: str):
-    """Send message to user via Telegram"""
+async def send_message_to_user(telegram_id: str, message: str, reply_markup=None):
+    """Send message to user via Telegram with optional inline keyboard"""
     try:
         # This would need the bot instance to send messages
         # For now, log the message that would be sent
-        logger.info(f"Alert for {telegram_id}: {message[:100]}...")
+        button_info = f" with {len(reply_markup.inline_keyboard)} button rows" if reply_markup else ""
+        logger.info(f"Alert for {telegram_id}{button_info}: {message[:100]}...")
     except Exception as e:
         logger.error(f"Failed to send message to {telegram_id}: {e}")
 
