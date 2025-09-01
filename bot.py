@@ -1077,6 +1077,27 @@ Click buttons below to modify settings:
                 await self._handle_portfolio_view(query, user_id)
             elif data.startswith('settings_'):
                 await self.settings_command(update, context)
+            
+            # Handle new enhanced action callbacks
+            elif data.startswith('analyze_wallet_'):
+                wallet_prefix = data.replace('analyze_wallet_', '')
+                await self._handle_analyze_wallet_callback(query, wallet_prefix, user_id)
+            elif data.startswith('analyze_token_'):
+                token_prefix = data.replace('analyze_token_', '')
+                await self._handle_analyze_token_callback(query, token_prefix, user_id)
+            elif data.startswith('add_watchlist_'):
+                wallet_prefix = data.replace('add_watchlist_', '')
+                await self._handle_add_watchlist_callback(query, wallet_prefix, user_id)
+            elif data.startswith('blacklist_wallet_'):
+                wallet_prefix = data.replace('blacklist_wallet_', '')
+                await self._handle_blacklist_wallet_callback(query, wallet_prefix, user_id)
+            elif data.startswith('blacklist_token_'):
+                token_prefix = data.replace('blacklist_token_', '')
+                await self._handle_blacklist_token_callback(query, token_prefix, user_id)
+            elif data.startswith('quick_buy_'):
+                token_prefix = data.replace('quick_buy_', '')
+                await self._handle_quick_buy_callback(query, token_prefix, user_id)
+            
             elif data == 'help':
                 await self._handle_help_callback(query)
             
