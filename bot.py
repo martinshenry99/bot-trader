@@ -1394,6 +1394,184 @@ Real trading would execute on live networks.
             logger.error(f"Refresh analysis error: {e}")
             await query.edit_message_text(f"❌ Failed to refresh analysis: {str(e)}")
 
+    async def _show_blacklist(self, update: Update, user_id: str):
+        """Show current blacklist"""
+        try:
+            db = get_db_session()
+            try:
+                user = db.query(User).filter(User.telegram_id == user_id).first()
+                if not user:
+                    await update.message.reply_text("❌ User not found. Please use /start first.")
+                    return
+                
+                alert_config = db.query(AlertConfig).filter(AlertConfig.user_id == user.id).first()
+                
+                if not alert_config:
+                    await update.message.reply_text("🚫 **Blacklist Empty**\n\nNo blacklisted wallets or tokens found.\n\nUse `/blacklist add wallet/token 0x123...` to add entries.")
+                    return
+                
+                blacklist_text = "🚫 **Current Blacklist**\n\n"
+                
+                # Show blacklisted wallets
+                if alert_config.blacklisted_wallets:
+                    wallets = alert_config.blacklisted_wallets.split(',')
+                    blacklist_text += "**🏦 Blacklisted Wallets:**\n"
+                    for wallet in wallets[:10]:  # Show first 10
+                        blacklist_text += f"• `{wallet[:16]}...`\n"
+                    if len(wallets) > 10:
+                        blacklist_text += f"... and {len(wallets) - 10} more\n"
+                    blacklist_text += "\n"
+                
+                # Show blacklisted tokens
+                if alert_config.blacklisted_tokens:
+                    tokens = alert_config.blacklisted_tokens.split(',')
+                    blacklist_text += "**🪙 Blacklisted Tokens:**\n"
+                    for token in tokens[:10]:  # Show first 10
+                        blacklist_text += f"• `{token[:16]}...`\n"
+                    if len(tokens) > 10:
+                        blacklist_text += f"... and {len(tokens) - 10} more\n"
+                
+                if not alert_config.blacklisted_wallets and not alert_config.blacklisted_tokens:
+                    blacklist_text += "No entries found.\n\nUse `/blacklist add wallet/token 0x123...` to add entries."
+                
+                await update.message.reply_text(blacklist_text, parse_mode='Markdown')
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Show blacklist error: {e}")
+            await update.message.reply_text(f"❌ Failed to load blacklist: {str(e)}")
+
+    async def _add_to_blacklist(self, user_id: str, entry_type: str, address: str, reason: str) -> bool:
+        """Add wallet or token to blacklist"""
+        try:
+            db = get_db_session()
+            try:
+                user = db.query(User).filter(User.telegram_id == user_id).first()
+                if not user:
+                    return False
+                
+                alert_config = db.query(AlertConfig).filter(AlertConfig.user_id == user.id).first()
+                if not alert_config:
+                    alert_config = AlertConfig(
+                        user_id=user.id,
+                        min_trade_size_usd=100.0,
+                        max_alerts_per_hour=20,
+                        monitored_chains="ethereum,bsc,solana",
+                        buy_alerts_enabled=True,
+                        sell_alerts_enabled=True,
+                        moonshot_alerts_enabled=True
+                    )
+                    db.add(alert_config)
+                
+                if entry_type == 'wallet':
+                    current = alert_config.blacklisted_wallets or ""
+                    if address not in current:
+                        alert_config.blacklisted_wallets = f"{current},{address}" if current else address
+                elif entry_type == 'token':
+                    current = alert_config.blacklisted_tokens or ""
+                    if address not in current:
+                        alert_config.blacklisted_tokens = f"{current},{address}" if current else address
+                
+                db.commit()
+                return True
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Add to blacklist error: {e}")
+            return False
+
+    async def _remove_from_blacklist(self, user_id: str, address: str) -> bool:
+        """Remove wallet or token from blacklist"""
+        try:
+            db = get_db_session()
+            try:
+                user = db.query(User).filter(User.telegram_id == user_id).first()
+                if not user:
+                    return False
+                
+                alert_config = db.query(AlertConfig).filter(AlertConfig.user_id == user.id).first()
+                if not alert_config:
+                    return False
+                
+                # Remove from wallets
+                if alert_config.blacklisted_wallets:
+                    wallets = alert_config.blacklisted_wallets.split(',')
+                    wallets = [w for w in wallets if w != address]
+                    alert_config.blacklisted_wallets = ','.join(wallets) if wallets else None
+                
+                # Remove from tokens
+                if alert_config.blacklisted_tokens:
+                    tokens = alert_config.blacklisted_tokens.split(',')
+                    tokens = [t for t in tokens if t != address]
+                    alert_config.blacklisted_tokens = ','.join(tokens) if tokens else None
+                
+                db.commit()
+                return True
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Remove from blacklist error: {e}")
+            return False
+
+    async def _show_watchlist(self, update: Update, user_id: str):
+        """Show current watchlist"""
+        try:
+            from services.wallet_scanner import wallet_scanner
+            watchlist = await wallet_scanner.get_user_watchlist(int(user_id))
+            
+            if not watchlist:
+                await update.message.reply_text("👁️ **Watchlist Empty**\n\nNo watched wallets found.\n\nUse `/watchlist add 0x123...` to add wallets to monitor.")
+                return
+            
+            watchlist_text = "👁️ **Current Watchlist**\n\n"
+            
+            for i, wallet in enumerate(watchlist[:20], 1):  # Show first 20
+                chains_str = ', '.join([c.upper() for c in wallet.get('chains', [])])
+                wallet_display = f"{wallet['address'][:8]}...{wallet['address'][-6:]}"
+                
+                watchlist_text += f"{i}. **{wallet_display}**\n"
+                watchlist_text += f"   🔗 Chains: {chains_str}\n"
+                watchlist_text += f"   📊 Trades: {wallet.get('total_trades', 0)}\n"
+                if wallet.get('name'):
+                    watchlist_text += f"   🏷️ Name: {wallet['name']}\n"
+                watchlist_text += "\n"
+            
+            if len(watchlist) > 20:
+                watchlist_text += f"... and {len(watchlist) - 20} more wallets\n"
+            
+            watchlist_text += f"\n**Total:** {len(watchlist)} watched wallets"
+            
+            await update.message.reply_text(watchlist_text, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Show watchlist error: {e}")
+            await update.message.reply_text(f"❌ Failed to load watchlist: {str(e)}")
+
+    async def _remove_from_watchlist(self, user_id: str, wallet_address: str) -> bool:
+        """Remove wallet from watchlist"""
+        try:
+            from services.wallet_scanner import wallet_scanner
+            return await wallet_scanner.remove_wallet_from_watchlist(wallet_address, int(user_id))
+        except Exception as e:
+            logger.error(f"Remove from watchlist error: {e}")
+            return False
+
+    def _validate_wallet_address(self, address: str) -> bool:
+        """Validate wallet address format"""
+        # Ethereum/BSC address validation
+        if address.startswith('0x') and len(address) == 42:
+            return True
+        # Solana address validation (base58, typically 32-44 chars)
+        elif len(address) >= 32 and len(address) <= 44 and not address.startswith('0x'):
+            return True
+        return False
+
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle errors"""
         logger.error(f"Update {update} caused error {context.error}")
