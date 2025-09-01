@@ -385,34 +385,40 @@ class WalletScanner:
         return True
     
     async def send_telegram_alert(self, telegram_id: str, signal: TradeSignal):
-        """Send Telegram alert to user"""
+        """Send enhanced Telegram alert to user"""
         try:
             from bot import send_message_to_user
+            from utils.formatting import AddressFormatter
             
-            # Format alert message
-            action_emoji = "🟢" if signal.action == "buy" else "🔴"
-            confidence_emoji = "🎯" if signal.confidence > 0.8 else "⚠️" if signal.confidence > 0.5 else "🔍"
+            # Get wallet name if available
+            wallet_name = f"Wallet {signal.source_wallet[-6:]}"
             
-            message = f"""
-{action_emoji} **WALLET ALERT** {confidence_emoji}
-
-**Action:** {signal.action.upper()}
-**Wallet:** `{signal.source_wallet[:8]}...{signal.source_wallet[-6:]}`
-**Token:** `{signal.token_address[:8]}...{signal.token_address[-6:]}`
-**Amount:** ${signal.amount:,.2f}
-**Chain:** {signal.blockchain.upper()}
-**Confidence:** {signal.confidence*100:.1f}%
-
-**Transaction:** `{signal.transaction_hash[:16]}...`
-**Time:** {signal.timestamp.strftime('%H:%M:%S')}
-
-{self.get_action_recommendation(signal)}
-            """
+            # Format the alert with enhanced formatting
+            message, buttons = AddressFormatter.format_trading_alert(
+                wallet_address=signal.source_wallet,
+                wallet_name=wallet_name,
+                action=signal.action,
+                token_address=signal.token_address,
+                token_symbol=f"Token {signal.token_address[-6:]}",
+                amount_usd=signal.amount,
+                chain=signal.blockchain,
+                tx_hash=signal.transaction_hash,
+                confidence=signal.confidence
+            )
             
-            await send_message_to_user(telegram_id, message)
+            # Add action recommendation
+            recommendation = self.get_action_recommendation(signal)
+            message += f"\n\n**💡 Recommendation:**\n{recommendation}"
+            
+            # Send message with buttons
+            await send_message_to_user(telegram_id, message, reply_markup=buttons)
+            
+            logger.info(f"📊 Enhanced alert sent to user {telegram_id}")
             
         except Exception as e:
-            logger.error(f"Error sending Telegram alert: {e}")
+            logger.error(f"Error sending enhanced alert: {e}")
+            # Fallback to simple message
+            await self._send_simple_alert(telegram_id, signal)
     
     def get_action_recommendation(self, signal: TradeSignal) -> str:
         """Get action recommendation based on signal"""
