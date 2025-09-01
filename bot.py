@@ -29,76 +29,57 @@ class MemeTraderBot:
         self.user_sessions = {}  # Track user sessions for multi-step operations
         
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
-        user = update.effective_user
-        chat_id = update.effective_chat.id
+        """Handle /start command with main menu"""
+        user_id = str(update.effective_user.id)
         
-        # Save user to database
-        db = get_db_session()
+        # Ensure user exists in database
+        await self.ensure_user_exists(user_id, update.effective_user)
+        
+        # Show main menu
+        await self.show_main_menu(update.message or update.callback_query, user_id)
+
+    async def show_main_menu(self, message_or_query, user_id: str, edit_message: bool = None):
+        """Show the main menu interface"""
         try:
-            existing_user = db.query(User).filter(User.telegram_id == str(user.id)).first()
-            if not existing_user:
-                new_user = User(
-                    telegram_id=str(user.id),
-                    username=user.username,
-                    first_name=user.first_name,
-                    last_name=user.last_name
-                )
-                db.add(new_user)
-                db.commit()
-                logger.info(f"New user registered: {user.username} ({user.id})")
-        finally:
-            db.close()
-        
-        welcome_message = f"""
-🚀 **Welcome to Meme Trader V4 Pro Enhanced!** 
+            from ui.main_menu import MainMenu
+            
+            menu_text, menu_keyboard = await MainMenu.get_main_menu(user_id)
+            
+            # Determine if we should edit or send new message
+            if hasattr(message_or_query, 'edit_text'):  # It's a callback query
+                await message_or_query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+            elif hasattr(message_or_query, 'reply_text'):  # It's a message
+                await message_or_query.reply_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
+            else:
+                logger.error("Invalid message_or_query object")
+                
+        except Exception as e:
+            logger.error(f"Error showing main menu: {e}")
+            # Fallback
+            fallback_text = "🚀 **MEME TRADER V4 PRO**\n\nUse /help to see available commands."
+            if hasattr(message_or_query, 'reply_text'):
+                await message_or_query.reply_text(fallback_text, parse_mode='Markdown')
 
-Hello {user.first_name}! Your advanced cryptocurrency trading assistant is ready.
-
-**🔥 Enhanced Features:**
-• Real-time mempool monitoring & early alerts
-• Advanced honeypot detection with simulation
-• AI-powered market analysis & trade execution
-• Multi-chain support (ETH/BSC testnet)
-• Smart trade execution with gas optimization
-• Enhanced portfolio tracking & risk management
-
-**📋 Available Commands:**
-/help - Show all commands
-/buy - Execute buy orders with pre-trade analysis
-/sell - Execute sell orders with profit/loss tracking
-/analyze - Advanced token analysis with honeypot detection
-/scan - Manual wallet scanning across chains
-/leaderboard - View moonshot wallet leaderboard
-/watchlist - Manage watched wallets
-/alerts - Configure alert settings
-/blacklist - Manage blacklisted wallets/tokens
-/portfolio - Advanced portfolio analytics
-/settings - Trading & risk management settings
-
-**⚠️ Enhanced Testnet Mode**
-Running on Ethereum Sepolia & BSC testnet with full mempool monitoring.
-
-**🔒 Security Features:**
-• Secure keystore management
-• Pre-trade honeypot simulation
-• Gas optimization & slippage protection
-• Real-time risk assessment
-
-Ready to trade smarter and safer? 📈🔒
-        """
-        
-        keyboard = [
-            [InlineKeyboardButton("💰 Buy Token", callback_data="buy_token")],
-            [InlineKeyboardButton("💸 Sell Token", callback_data="sell_token")],
-            [InlineKeyboardButton("🔍 Analyze Token", callback_data="analyze_token")],
-            [InlineKeyboardButton("👛 Manage Wallets", callback_data="manage_wallets")],
-            [InlineKeyboardButton("📊 Portfolio", callback_data="view_portfolio")],
-            [InlineKeyboardButton("❓ Help", callback_data="help")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
+    async def ensure_user_exists(self, telegram_id: str, user_data):
+        """Ensure user exists in database"""
+        try:
+            db = get_db_session()
+            try:
+                user = db.query(User).filter(User.telegram_id == telegram_id).first()
+                if not user:
+                    user = User(
+                        telegram_id=telegram_id,
+                        username=getattr(user_data, 'username', None),
+                        first_name=getattr(user_data, 'first_name', None),
+                        last_name=getattr(user_data, 'last_name', None)
+                    )
+                    db.add(user)
+                    db.commit()
+                    logger.info(f"Created new user: {telegram_id}")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Error ensuring user exists: {e}")
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
