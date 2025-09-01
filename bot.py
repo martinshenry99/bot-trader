@@ -1297,7 +1297,6 @@ async def send_message_to_user(telegram_id: str, message: str):
     except Exception as e:
         logger.error(f"Failed to send message to {telegram_id}: {e}")
 
-
 class MemeTraderBotContinuation:
     """Continuation of MemeTraderBot class methods"""
     
