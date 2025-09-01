@@ -113,26 +113,38 @@ Ready to trade smarter and safer? 📈🔒
 • Percentage of holdings to sell (1-100)
 • Profit/loss calculation & tax optimization
 
-**🔍 Analysis Commands:**
+**🔍 Analysis & Monitoring:**
 /analyze [token_address] - Advanced token analysis
 • Comprehensive honeypot detection
 • AI-powered risk assessment
 • Real-time liquidity & volume analysis
 • Trading safety score (0-10)
 
-**👛 Wallet Management:**
-/wallet - Secure wallet management
-• Import/export keystore files
-• Multi-wallet portfolio tracking
-• Address monitoring setup
-• Security features & backup
+/scan - Manual wallet scan across all chains
+• Scan all watched wallets for new transactions
+• Get real-time trading signals and alerts
+• Monitor moonshot opportunities
 
-**📊 Monitoring & Alerts:**
-/monitor - Enhanced monitoring setup
-• Real-time mempool tracking
-• Price movement alerts (custom thresholds)
-• Wallet activity notifications
-• New token discovery alerts
+/leaderboard - View moonshot wallet leaderboard
+• Top wallets with 200x+ gains
+• Performance metrics and win rates
+• Copy trading opportunities
+
+**👁️ Wallet & Alert Management:**
+/watchlist - Manage watched wallets
+• Add/remove wallets to monitor
+• Multi-chain wallet tracking
+• Real-time activity alerts
+
+/alerts - Configure alert settings
+• Set minimum trade size filters
+• Enable/disable alert types
+• Chain-specific monitoring
+
+/blacklist - Manage blacklisted wallets/tokens
+• Block suspicious wallets from alerts
+• Filter out honeypot tokens
+• Custom filtering rules
 
 **📈 Portfolio & Analytics:**
 /portfolio - Advanced portfolio analytics
@@ -153,11 +165,14 @@ Ready to trade smarter and safer? 📈🔒
 • AI-guided trade execution
 • Advanced market sentiment analysis
 • Mempool monitoring & early alerts
+• Moonshot wallet discovery
 
-**💡 Trading Examples:**
+**💡 Command Examples:**
 • Buy: `/buy eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 5`
 • Sell: `/sell eth 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b 25`
 • Analyze: `/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`
+• Watch wallet: `/watchlist add 0x742d35... ethereum,bsc WhaleWallet`
+• Configure alerts: `/alerts`
 
 **🚨 Safety First:**
 All trades include pre-execution checks:
