@@ -1304,6 +1304,109 @@ Need detailed help? Use /help command.
         """
         await query.edit_message_text(help_text, parse_mode='Markdown')
 
+    async def _handle_analyze_wallet_callback(self, query, wallet_prefix: str, user_id: str):
+        """Handle analyze wallet callback"""
+        try:
+            # In a real implementation, you'd store the full address mapped to the prefix
+            # For now, show a placeholder
+            await query.edit_message_text(
+                f"🔍 **Wallet Analysis**\n\n"
+                f"Analyzing wallet `{wallet_prefix}...`\n\n"
+                f"This would show:\n"
+                f"• Trading history and patterns\n"
+                f"• Win rate and performance\n"
+                f"• Risk assessment\n"
+                f"• Recent transactions\n\n"
+                f"*Feature coming soon!*"
+            )
+        except Exception as e:
+            logger.error(f"Analyze wallet callback error: {e}")
+            await query.edit_message_text("❌ Error analyzing wallet")
+
+    async def _handle_analyze_token_callback(self, query, token_prefix: str, user_id: str):
+        """Handle analyze token callback"""
+        try:
+            # In a real implementation, you'd store the full address mapped to the prefix
+            # For now, show a placeholder
+            await query.edit_message_text(
+                f"🔍 **Token Analysis**\n\n"
+                f"Analyzing token `{token_prefix}...`\n\n"
+                f"This would show:\n"
+                f"• Security scan results\n"
+                f"• Liquidity analysis\n"
+                f"• Holder distribution\n"
+                f"• Trading safety score\n\n"
+                f"*Feature coming soon!*"
+            )
+        except Exception as e:
+            logger.error(f"Analyze token callback error: {e}")
+            await query.edit_message_text("❌ Error analyzing token")
+
+    async def _handle_add_watchlist_callback(self, query, wallet_prefix: str, user_id: str):
+        """Handle add to watchlist callback"""
+        try:
+            await query.edit_message_text(
+                f"👁️ **Add to Watchlist**\n\n"
+                f"Adding wallet `{wallet_prefix}...` to your watchlist\n\n"
+                f"✅ You'll receive alerts when this wallet:\n"
+                f"• Buys new tokens\n"
+                f"• Sells existing positions\n"
+                f"• Makes large trades\n\n"
+                f"*Feature coming soon!*"
+            )
+        except Exception as e:
+            logger.error(f"Add watchlist callback error: {e}")
+            await query.edit_message_text("❌ Error adding to watchlist")
+
+    async def _handle_blacklist_wallet_callback(self, query, wallet_prefix: str, user_id: str):
+        """Handle blacklist wallet callback"""
+        try:
+            await query.edit_message_text(
+                f"🚫 **Blacklist Wallet**\n\n"
+                f"Blacklisting wallet `{wallet_prefix}...`\n\n"
+                f"✅ This wallet will be:\n"
+                f"• Excluded from all alerts\n"
+                f"• Blocked from mirror trading\n"
+                f"• Hidden from leaderboards\n\n"
+                f"*Feature coming soon!*"
+            )
+        except Exception as e:
+            logger.error(f"Blacklist wallet callback error: {e}")
+            await query.edit_message_text("❌ Error blacklisting wallet")
+
+    async def _handle_blacklist_token_callback(self, query, token_prefix: str, user_id: str):
+        """Handle blacklist token callback"""
+        try:
+            await query.edit_message_text(
+                f"🚫 **Blacklist Token**\n\n"
+                f"Blacklisting token `{token_prefix}...`\n\n"
+                f"✅ This token will be:\n"
+                f"• Excluded from trading alerts\n"
+                f"• Blocked from auto-trading\n"
+                f"• Hidden from recommendations\n\n"
+                f"*Feature coming soon!*"
+            )
+        except Exception as e:
+            logger.error(f"Blacklist token callback error: {e}")
+            await query.edit_message_text("❌ Error blacklisting token")
+
+    async def _handle_quick_buy_callback(self, query, token_prefix: str, user_id: str):
+        """Handle quick buy callback"""
+        try:
+            await query.edit_message_text(
+                f"💰 **Quick Buy**\n\n"
+                f"Preparing to buy token `{token_prefix}...`\n\n"
+                f"🔍 This would:\n"
+                f"• Show current token price\n"
+                f"• Display liquidity info\n"
+                f"• Offer buy amount options\n"
+                f"• Execute with one click\n\n"
+                f"*Feature coming soon!*"
+            )
+        except Exception as e:
+            logger.error(f"Quick buy callback error: {e}")
+            await query.edit_message_text("❌ Error with quick buy")
+
     async def _show_blacklist(self, update: Update, user_id: str):
         """Show current blacklist entries"""
         try:
