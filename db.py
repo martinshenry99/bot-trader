@@ -21,6 +21,9 @@ class User(Base):
     # Relationships
     wallets = relationship("Wallet", back_populates="user")
     trades = relationship("Trade", back_populates="user")
+    wallet_watches = relationship("WalletWatch", back_populates="user")
+    alert_config = relationship("AlertConfig", back_populates="user", uselist=False)
+    blacklist_entries = relationship("BlacklistEntry", back_populates="user")
 
 class Wallet(Base):
     __tablename__ = 'wallets'
@@ -36,6 +39,116 @@ class Wallet(Base):
     # Relationships
     user = relationship("User", back_populates="wallets")
     transactions = relationship("Transaction", back_populates="wallet")
+
+class WalletWatch(Base):
+    __tablename__ = 'wallet_watches'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    wallet_address = Column(String, nullable=False)
+    wallet_name = Column(String)  # User-defined name for the wallet
+    chains = Column(String)  # Comma-separated list of chains to monitor
+    is_active = Column(Boolean, default=True)
+    added_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Performance tracking
+    total_pnl = Column(Float)
+    win_rate = Column(Float)
+    total_trades = Column(Integer)
+    best_multiplier = Column(Float)
+    last_active = Column(DateTime)
+    reputation_score = Column(Float)
+    
+    # Relationships
+    user = relationship("User", back_populates="wallet_watches")
+
+class AlertConfig(Base):
+    __tablename__ = 'alert_configs'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    
+    # Alert settings
+    min_trade_size_usd = Column(Float, default=100.0)
+    max_alerts_per_hour = Column(Integer, default=20)
+    monitored_chains = Column(String)  # Comma-separated: ethereum,bsc,solana
+    
+    # Alert types
+    buy_alerts_enabled = Column(Boolean, default=True)
+    sell_alerts_enabled = Column(Boolean, default=True)
+    moonshot_alerts_enabled = Column(Boolean, default=True)
+    
+    # Filters
+    blacklisted_wallets = Column(Text)  # Comma-separated wallet addresses
+    blacklisted_tokens = Column(Text)   # Comma-separated token addresses
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="alert_config")
+
+class BlacklistEntry(Base):
+    __tablename__ = 'blacklist_entries'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    entry_type = Column(String, nullable=False)  # 'wallet' or 'token'
+    address = Column(String, nullable=False)
+    reason = Column(String)
+    added_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="blacklist_entries")
+
+class MoonshotWallet(Base):
+    __tablename__ = 'moonshot_wallets'
+    
+    id = Column(Integer, primary_key=True)
+    wallet_address = Column(String, unique=True, nullable=False)
+    best_multiplier = Column(Float, nullable=False)
+    total_pnl_usd = Column(Float)
+    win_rate = Column(Float)
+    total_trades = Column(Integer)
+    best_trade_token = Column(String)
+    best_trade_amount = Column(Float)
+    chains = Column(String)
+    reputation_score = Column(Float)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+    
+    # Performance over time
+    multiplier_30d = Column(Float)
+    multiplier_7d = Column(Float)
+    multiplier_24h = Column(Float)
+
+class DailyReport(Base):
+    __tablename__ = 'daily_reports'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    report_date = Column(DateTime, nullable=False)
+    
+    # Trading metrics
+    total_trades = Column(Integer, default=0)
+    successful_trades = Column(Integer, default=0)
+    failed_trades = Column(Integer, default=0)
+    total_pnl_usd = Column(Float, default=0.0)
+    
+    # Alert metrics
+    alerts_received = Column(Integer, default=0)
+    alerts_acted_on = Column(Integer, default=0)
+    
+    # Portfolio metrics
+    portfolio_value_usd = Column(Float)
+    portfolio_change_pct = Column(Float)
+    
+    # Top performers
+    best_trade_pnl = Column(Float)
+    worst_trade_pnl = Column(Float)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class Token(Base):
     __tablename__ = 'tokens'
