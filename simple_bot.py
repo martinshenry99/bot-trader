@@ -1005,7 +1005,8 @@ This amount will be used for:
                 f"• Data processing load\n\n"
                 f"Please try again in a few minutes."
             )
-            await self.show_main_menu(query, user_id)
+            await asyncio.sleep(3)
+            await self.show_main_menu_callback(query, user_id)
 
 
     async def handle_cancel_trade(self, query, user_id: str):

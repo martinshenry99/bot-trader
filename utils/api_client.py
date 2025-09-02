@@ -7,9 +7,51 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+class APIClient:
+    """API Client utilities for Meme Trader V4 Pro"""
+    def __init__(self):
+        self.session = None
+
+    async def get_session(self):
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+        return self.session
+
+    async def close(self):
+        if self.session:
+            await self.session.close()
+
+    async def get(self, url: str, params: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+        """Make GET request"""
+        try:
+            session = await self.get_session()
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    logger.error(f"API request failed: {response.status}")
+                    return None
+        except Exception as e:
+            logger.error(f"API request error: {e}")
+            return None
+
+    async def post(self, url: str, data: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+        """Make POST request"""
+        try:
+            session = await self.get_session()
+            async with session.post(url, json=data) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    logger.error(f"API request failed: {response.status}")
+                    return None
+        except Exception as e:
+            logger.error(f"API request error: {e}")
+            return None
+
 class CovalentAPI:
     """Covalent API client for blockchain data"""
-    
+
     def __init__(self):
         self.api_key = Config.COVALENT_API_KEY
         self.base_url = "https://api.covalenthq.com/v1"
@@ -18,7 +60,7 @@ class CovalentAPI:
         self.rate_limit_reset = datetime.utcnow()
         self.requests_made = 0
         self.max_requests_per_minute = 100
-        
+
     async def get_session(self):
         """Get or create aiohttp session"""
         if self.session is None or self.session.closed:
@@ -27,21 +69,21 @@ class CovalentAPI:
                 headers={'Authorization': f'Bearer {self.api_key}'}
             )
         return self.session
-    
+
     async def close_session(self):
         """Close aiohttp session"""
         if self.session and not self.session.closed:
             await self.session.close()
-    
+
     async def make_request(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
         """Make rate-limited API request"""
         try:
             # Rate limiting
             await self.handle_rate_limit()
-            
+
             session = await self.get_session()
             url = f"{self.base_url}/{endpoint}"
-            
+
             async with session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -53,20 +95,20 @@ class CovalentAPI:
                 else:
                     logger.error(f"API request failed: {response.status}")
                     return None
-                    
+
         except Exception as e:
             logger.error(f"API request error: {e}")
             return None
-    
+
     async def handle_rate_limit(self):
         """Handle API rate limiting"""
         now = datetime.utcnow()
-        
+
         # Reset counter every minute
         if now >= self.rate_limit_reset:
             self.requests_made = 0
             self.rate_limit_reset = now + timedelta(minutes=1)
-        
+
         # Wait if we've hit the limit
         if self.requests_made >= self.max_requests_per_minute:
             wait_time = (self.rate_limit_reset - now).total_seconds()
@@ -75,15 +117,15 @@ class CovalentAPI:
                 await asyncio.sleep(wait_time)
                 self.requests_made = 0
                 self.rate_limit_reset = datetime.utcnow() + timedelta(minutes=1)
-        
+
         self.requests_made += 1
-    
+
     async def get_token_data(self, token_address: str) -> Optional[Dict]:
         """Get token information"""
         try:
             endpoint = f"{self.chain_id}/tokens/{token_address}"
             response = await self.make_request(endpoint)
-            
+
             if response:
                 items = response.get('items', [])
                 if items:
@@ -99,30 +141,30 @@ class CovalentAPI:
                         'liquidity_usd': 0,  # Not available in this endpoint
                         'volume_24h': 0  # Not available in this endpoint
                     }
-            
+
             return None
-            
+
         except Exception as e:
             logger.error(f"Failed to get token data: {e}")
             return None
-    
+
     async def get_token_holders(self, token_address: str, page: int = 0) -> Optional[List[Dict]]:
         """Get token holders"""
         try:
             endpoint = f"{self.chain_id}/tokens/{token_address}/token_holders"
             params = {'page-number': page, 'page-size': 100}
-            
+
             response = await self.make_request(endpoint, params)
-            
+
             if response:
                 return response.get('items', [])
-            
+
             return []
-            
+
         except Exception as e:
             logger.error(f"Failed to get token holders: {e}")
             return []
-    
+
     async def get_wallet_transactions(self, wallet_address: str, from_block: int = 0) -> List[Dict]:
         """Get wallet transactions"""
         try:
@@ -132,12 +174,12 @@ class CovalentAPI:
                 'no-logs': 'false',
                 'page-size': 100
             }
-            
+
             if from_block > 0:
                 params['starting-block'] = from_block
-            
+
             response = await self.make_request(endpoint, params)
-            
+
             if response:
                 transactions = []
                 for item in response.get('items', []):
@@ -152,21 +194,21 @@ class CovalentAPI:
                         'gas_price': float(item.get('gas_price', 0)) / 1e9,  # Convert to Gwei
                         'successful': item.get('successful')
                     })
-                
+
                 return transactions
-            
+
             return []
-            
+
         except Exception as e:
             logger.error(f"Failed to get wallet transactions: {e}")
             return []
-    
+
     async def get_wallet_balances(self, wallet_address: str) -> List[Dict]:
         """Get wallet token balances"""
         try:
             endpoint = f"{self.chain_id}/address/{wallet_address}/balances_v2"
             response = await self.make_request(endpoint)
-            
+
             if response:
                 balances = []
                 for item in response.get('items', []):
@@ -181,30 +223,30 @@ class CovalentAPI:
                             'price_usd': float(item.get('quote', 0) or 0),
                             'value_usd': float(item.get('quote', 0) or 0) * (float(item.get('balance', 0)) / (10 ** item.get('contract_decimals', 18)))
                         })
-                
+
                 return balances
-            
+
             return []
-            
+
         except Exception as e:
             logger.error(f"Failed to get wallet balances: {e}")
             return []
 
 class CovalentClient:
     """Main Covalent client with connection pooling"""
-    
+
     def __init__(self):
         self.apis = [CovalentAPI()]  # Can add multiple API instances for rotation
         self.current_api_index = 0
-    
+
     def get_current_api(self) -> CovalentAPI:
         """Get current API instance"""
         return self.apis[self.current_api_index]
-    
+
     def rotate_api(self):
         """Rotate to next API instance"""
         self.current_api_index = (self.current_api_index + 1) % len(self.apis)
-    
+
     async def get_token_data(self, token_address: str) -> Optional[Dict]:
         """Get token data with API rotation on failure"""
         for _ in range(len(self.apis)):
@@ -215,11 +257,11 @@ class CovalentClient:
                     return result
             except Exception as e:
                 logger.error(f"API call failed: {e}")
-            
+
             self.rotate_api()
-        
+
         return None
-    
+
     async def get_token_holders(self, token_address: str, page: int = 0) -> List[Dict]:
         """Get token holders with API rotation"""
         for _ in range(len(self.apis)):
@@ -230,11 +272,11 @@ class CovalentClient:
                     return result
             except Exception as e:
                 logger.error(f"API call failed: {e}")
-            
+
             self.rotate_api()
-        
+
         return []
-    
+
     async def get_wallet_transactions(self, wallet_address: str, from_block: int = 0) -> List[Dict]:
         """Get wallet transactions with API rotation"""
         for _ in range(len(self.apis)):
@@ -245,11 +287,11 @@ class CovalentClient:
                     return result
             except Exception as e:
                 logger.error(f"API call failed: {e}")
-            
+
             self.rotate_api()
-        
+
         return []
-    
+
     async def get_wallet_balances(self, wallet_address: str) -> List[Dict]:
         """Get wallet balances with API rotation"""
         for _ in range(len(self.apis)):
@@ -260,11 +302,11 @@ class CovalentClient:
                     return result
             except Exception as e:
                 logger.error(f"API call failed: {e}")
-            
+
             self.rotate_api()
-        
+
         return []
-    
+
     async def close_all_sessions(self):
         """Close all API sessions"""
         for api in self.apis:

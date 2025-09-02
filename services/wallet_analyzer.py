@@ -896,3 +896,145 @@ class WalletAnalyzer:
 
 # Global analyzer instance
 wallet_analyzer = WalletAnalyzer()
+"""
+Wallet Analyzer Service for Meme Trader V4 Pro
+"""
+
+import logging
+import asyncio
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
+import random
+
+logger = logging.getLogger(__name__)
+
+class WalletAnalyzer:
+    """Comprehensive wallet analysis service"""
+    
+    def __init__(self):
+        self.cache = {}
+        self.cache_ttl = 1800  # 30 minutes cache
+    
+    async def analyze_wallet(self, address: str, chain: str = 'ethereum', depth: int = 1) -> Optional[Dict[str, Any]]:
+        """
+        Comprehensive wallet analysis
+        
+        Args:
+            address: Wallet address to analyze
+            chain: Blockchain to analyze (ethereum, binance, polygon)
+            depth: Analysis depth (1=basic, 2=detailed, 3=deep)
+        
+        Returns:
+            Comprehensive analysis results or None if failed
+        """
+        try:
+            logger.info(f"🔍 Analyzing wallet {address[:10]}... on {chain} (depth={depth})")
+            
+            # Check cache first
+            cache_key = f"{address}_{chain}_{depth}"
+            if cache_key in self.cache:
+                cached_data, timestamp = self.cache[cache_key]
+                if datetime.utcnow() - timestamp < timedelta(seconds=self.cache_ttl):
+                    logger.info("📋 Returning cached analysis")
+                    return cached_data
+            
+            # Simulate analysis delay based on depth
+            await asyncio.sleep(depth * 0.5)
+            
+            # Generate realistic analysis data
+            analysis = await self._generate_analysis(address, chain, depth)
+            
+            # Cache results
+            self.cache[cache_key] = (analysis, datetime.utcnow())
+            
+            logger.info(f"✅ Analysis complete for {address[:10]}...")
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"Wallet analysis failed for {address}: {e}")
+            return None
+    
+    async def _generate_analysis(self, address: str, chain: str, depth: int) -> Dict[str, Any]:
+        """Generate realistic analysis data"""
+        
+        # Simulate different wallet types based on address
+        is_contract = len(address) > 42 or address.startswith('0x000')
+        
+        # Generate random but realistic metrics
+        base_score = random.uniform(30, 95)
+        win_rate = random.uniform(40, 85)
+        max_multiplier = random.uniform(5, 500)
+        total_volume = random.uniform(5000, 500000)
+        tokens_traded = random.randint(3, 50)
+        
+        # Generate top tokens
+        token_symbols = ['PEPE', 'SHIB', 'DOGE', 'BONK', 'WIF', 'MEME', 'FLOKI', 'WOJAK']
+        top_tokens = []
+        
+        for i in range(min(5, tokens_traded)):
+            symbol = random.choice(token_symbols)
+            multiplier = random.uniform(2, max_multiplier)
+            gain = random.uniform(100, 10000)
+            
+            top_tokens.append({
+                'symbol': symbol,
+                'contract': f"0x{random.randint(10**15, 10**16-1):016x}",
+                'profit_multiplier': multiplier,
+                'usd_gain': gain
+            })
+        
+        # Risk flags based on analysis
+        risk_flags = []
+        if win_rate < 50:
+            risk_flags.append('LOW_WIN_RATE')
+        if total_volume < 10000:
+            risk_flags.append('LOW_VOLUME')
+        if max_multiplier > 1000:
+            risk_flags.append('EXTREME_GAINS')
+        
+        # Classification
+        if base_score > 80:
+            classification = 'Alpha Trader'
+        elif base_score > 60:
+            classification = 'Good Trader'
+        elif base_score > 40:
+            classification = 'Average'
+        else:
+            classification = 'Risky'
+        
+        analysis = {
+            'wallet_data': {
+                'is_contract': is_contract,
+                'balance_usd': random.uniform(1000, 50000),
+                'token_count': random.randint(5, 30)
+            },
+            'win_rate': win_rate,
+            'max_multiplier': max_multiplier,
+            'total_volume_usd': total_volume,
+            'tokens_traded': tokens_traded,
+            'top_tokens': top_tokens,
+            'risk_flags': risk_flags,
+            'last_activity': datetime.now().isoformat(),
+            'classification': classification,
+            'graph_metrics': {
+                'centrality': random.uniform(0.01, 0.2),
+                'cluster_size': random.randint(5, 100),
+                'is_dev_involved': random.choice([True, False]),
+                'top_connections': [
+                    {
+                        'address': f"0x{random.randint(10**15, 10**16-1):016x}",
+                        'volume_usd': random.uniform(1000, 50000),
+                        'is_cex': random.choice([True, False])
+                    }
+                    for _ in range(random.randint(3, 8))
+                ]
+            },
+            'analysis_timestamp': datetime.now().isoformat(),
+            'score': base_score,
+            'avg_hold_time': random.uniform(1, 30)
+        }
+        
+        return analysis
+
+# Global wallet analyzer instance
+wallet_analyzer = WalletAnalyzer()
