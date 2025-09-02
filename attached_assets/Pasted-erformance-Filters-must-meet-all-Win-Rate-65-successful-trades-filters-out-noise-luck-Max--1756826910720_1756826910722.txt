@@ -1,0 +1,93 @@
+erformance Filters (must meet all)
+
+Win Rate: >65% successful trades (filters out noise/luck).
+
+Max Multiplier: ≥50x achieved at least once.
+
+Average ROI: >3x across last 10 trades.
+
+Trading Volume: >$15k lifetime (proves seriousness).
+
+Trade Count: >15 total trades (proves consistency).
+
+2. Recency & Activity
+
+Last 30 Days: at least 3 trades (ensures still active).
+
+Recent ROI: positive returns in the last 5 trades (not washed out).
+
+3. Risk & Safety Filters
+
+Honeypot Check: exclude wallets interacting with known honeypots/rugs.
+
+Dev Wallet Detection: exclude wallets linked to token deployers.
+
+CEX Abuse Check: avoid wallets only bridging through exchanges with no on-chain activity.
+
+Blacklist Filter: exclude flagged scam wallets.
+
+4. Graph & Network Intelligence
+
+Connected Wallets: prioritize wallets trading alongside other successful addresses.
+
+Network Centrality: give higher score if they are “hub wallets” (many profitable interactions).
+
+Copycat Detection: exclude pure copiers who only follow one whale blindly.
+
+5. Scoring Algorithm (0–100)
+
+Win Rate (20 pts):
+80%+ = 20, 70–79% = 15, 65–69% = 10
+
+Max Multiplier (20 pts):
+100x+ = 20, 75x = 15, 50x = 10
+
+Average ROI (15 pts):
+
+5x avg = 15, >3x = 10
+
+Trading Volume (15 pts):
+
+$100k = 15, >$50k = 10, >$15k = 5
+
+Consistency (10 pts):
+
+30 trades lifetime = 10, >15 = 5
+
+Recency (10 pts):
+Profitable in last 30 days = 10
+
+Risk Flags (10 pts):
+No red flags = 10, 1–2 mild risks = 5
+
+📊 Total Score = 0–100
+Only return wallets with ≥70 score.
+
+6. Bot Output
+
+When user runs /scan, bot should return:
+
+📈 Top Traders Found (Ethereum, Solana, BSC)
+
+1️⃣ 0xAbc123... (Score: 92/100)  
+   ✅ Win Rate: 78% | 💰 ROI Avg: 4.5x  
+   🔥 Last 50x on PEPE early  
+   ⚡ Active: 6 trades in last 30 days  
+   ✅ Passed safety filters  
+
+[📋 Copy Address] [🔍 Analyze] [⭐ Watchlist]
+
+2️⃣ 0xDef456... (Score: 85/100)  
+   ✅ Win Rate: 72% | 💰 ROI Avg: 3.9x  
+   ⚡ Active: 4 trades in last 30 days  
+   ✅ Safe, clean history  
+
+[📋 Copy Address] [🔍 Analyze] [⭐ Watchlist]
+
+🔐 Safety Mode Always On
+
+Never output wallets failing safety/risk checks.
+
+Show ⚠️ warnings if something is slightly off (e.g., too many short holds).
+
+Keeps your scan “Pro only” — no Degen, no n
