@@ -404,7 +404,7 @@ Welcome {username}! 👋
 
                 token_id = pos.get('token_address', '')[:10]
                 keyboard.append([
-                    InlineKeyboardButton(f"📤 Sell {token_symbol}", callback_data=f"select_sell_{token_id}")
+                    InlineKeyboardButton(f"ArchiveAction {token_symbol}", callback_data=f"select_sell_{token_id}")
                 ])
 
             message += "\n\n**Or use manual command:**\n`/sell [chain] [token_address] [percentage]`"
@@ -939,99 +939,8 @@ This amount will be used for:
         try:
             from services.wallet_scanner import wallet_scanner
 
-            # Show scanning progress
-            await query.edit_message_text(
-                "🔍 **Comprehensive Trader Scan**\n\n"
-                "⏳ Scanning across all chains...\n"
-                "📊 Applying performance filters (>65% WR, >50x)\n"
-                "🛡️ Safety checks in progress...\n"
-                "⚡ Analyzing recent activity...\n\n"
-                "*This may take 30-60 seconds*",
-                parse_mode='Markdown'
-            )
-
-            # Perform comprehensive scan across multiple chains
-            all_results = []
-            chains = ['ethereum', 'bsc', 'solana']
-            
-            for chain in chains:
-                try:
-                    results = await wallet_scanner.top_trader_scanner.scan_top_traders(
-                        timeframe='30d', 
-                        chain=chain
-                    )
-                    for result in results:
-                        result['chain'] = chain
-                        all_results.append(result)
-                except Exception as e:
-                    logger.error(f"Scan failed for {chain}: {e}")
-
-            # Sort by score and take top performers
-            top_performers = sorted(all_results, key=lambda x: x.get('score', 0), reverse=True)[:10]
-
-            if not top_performers:
-                await query.edit_message_text(
-                    "❌ **No Qualifying Traders Found**\n\n"
-                    "Current market conditions didn't yield any wallets meeting our strict criteria:\n"
-                    "• Win Rate >65%\n"
-                    "• Max Multiplier ≥50x\n"
-                    "• Average ROI >3x\n"
-                    "• Volume >$15k\n"
-                    "• Recent activity\n\n"
-                    "Try again later or check the leaderboard for historical top performers.",
-                    parse_mode='Markdown'
-                )
-                return
-
-            # Format results according to specification
-            message = "📈 **Top Traders Found** (Ethereum, Solana, BSC)\n\n"
-            
-            for i, trader in enumerate(top_performers[:5], 1):
-                chain_emoji = "🔷" if trader['chain'] == 'ethereum' else "🟡" if trader['chain'] == 'bsc' else "🟣"
-                addr = trader.get('wallet_address', trader.get('address', 'Unknown'))
-                score = trader.get('score', 0)
-                win_rate = trader.get('win_rate', 0)
-                avg_roi = trader.get('avg_roi', trader.get('max_multiplier', 1))
-                max_multiplier = trader.get('max_multiplier', 1)
-                trades_30d = trader.get('trades_last_30_days', trader.get('tokens_traded', 0))
-                best_token = trader.get('best_token_symbol', 'Unknown')
-                
-                message += f"{i}️⃣ {chain_emoji} `{addr[:6]}...{addr[-4:]}` (Score: {score}/100)\n"
-                message += f"   ✅ Win Rate: {win_rate:.0f}% | 💰 ROI Avg: {avg_roi:.1f}x\n"
-                message += f"   🔥 Best {max_multiplier:.0f}x on {best_token}\n"
-                message += f"   ⚡ Active: {trades_30d} trades in last 30 days\n"
-                message += f"   ✅ Passed all safety filters\n\n"
-
-            message += "🔐 **Safety Mode Always On**\n"
-            message += "✅ All wallets verified clean - no rugs, honeypots, or dev wallets\n"
-            message += "⚠️ Only pro-level traders shown (Score ≥70)\n\n"
-            message += "Use buttons below to interact with any trader:"
-
-            # Create interactive buttons
-            keyboard = []
-            for i, trader in enumerate(top_performers[:3]):
-                addr = trader.get('wallet_address', trader.get('address', 'Unknown'))
-                keyboard.append([
-                    InlineKeyboardButton("📋 Copy", callback_data=f"copy_{addr}"),
-                    InlineKeyboardButton("🔍 Analyze", callback_data=f"analyze_{addr}"),
-                    InlineKeyboardButton("⭐ Watchlist", callback_data=f"watchlist_{addr}")
-                ])
-            
-            keyboard.append([InlineKeyboardButton("🔄 Refresh Scan", callback_data="scan_top_traders")])
-            keyboard.append([InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")])
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-
-        except Exception as e:
-            logger.error(f"Comprehensive scan error: {e}")
-            await query.edit_message_text(
-                "❌ **Scan Failed**\n\n"
-                f"Error: {str(e)}\n\n"
-                "Please try again or contact support if the issue persists.",
-                parse_mode='Markdown'
-            ) = (
+            # Show scanning criteria first
+            criteria_message = (
                 "🔍 **Top Traders Scanning Criteria**\n\n"
                 "**📊 Performance Metrics:**\n"
                 "• Win Rate: >60% (Higher = Better Score)\n"
