@@ -66,22 +66,31 @@ class TopTraderScanner:
 
     async def scan_top_traders(self, timeframe: str = '7d', chain: str = 'ethereum') -> List[Dict]:
         """
-        Scan for top performing traders based on profitability
+        Comprehensive top trader scan with advanced filtering and scoring
 
-        Criteria for top traders:
-        1. Minimum 200x profit in timeframe
-        2. Active trading (not dormant wallets)  
-        3. Passed liquidity checks on recent trades
-        4. Not blacklisted/flagged as rug pullers
-        5. Minimum $5000 volume in timeframe
-        6. Win rate > 60%
+        Performance Filters (must meet all):
+        - Win Rate: >65% successful trades (filters out noise/luck)
+        - Max Multiplier: ≥50x achieved at least once
+        - Average ROI: >3x across last 10 trades
+        - Trading Volume: >$15k lifetime (proves seriousness)
+        - Trade Count: >15 total trades (proves consistency)
+
+        Recency & Activity:
+        - Last 30 Days: at least 3 trades (ensures still active)
+        - Recent ROI: positive returns in the last 5 trades
+
+        Risk & Safety Filters:
+        - Honeypot Check: exclude wallets interacting with known honeypots/rugs
+        - Dev Wallet Detection: exclude wallets linked to token deployers
+        - CEX Abuse Check: avoid wallets only bridging through exchanges
+        - Blacklist Filter: exclude flagged scam wallets
 
         Args:
             timeframe: Analysis timeframe ('1d', '7d', '30d')
             chain: Blockchain to scan ('ethereum', 'bsc', 'solana')
 
         Returns:
-            List of top trader wallet data with profitability metrics
+            List of top trader wallet data with comprehensive scores (≥70 required)
         """
         try:
             logger.info(f"🔍 Scanning top traders on {chain} for {timeframe}")
@@ -242,106 +251,136 @@ class TopTraderScanner:
             logger.error(f"Trader performance analysis failed for {wallet_address}: {e}")
             return None
 
-    def _calculate_trader_score_fallback(self, analysis: Dict) -> float:
+    def _calculate_trader_score_comprehensive(self, analysis: Dict) -> float:
         """
-        Calculate comprehensive trader score (0-100) (Original Logic)
+        Calculate comprehensive trader score (0-100) based on new criteria
 
-        Scoring Criteria:
-        - Win Rate (25 points): 60%+ gets full points
-        - Max Multiplier (25 points): 100x+ gets full points  
-        - Volume (20 points): $100k+ gets full points
-        - Consistency (15 points): Regular trading, good hold times
-        - Risk Assessment (15 points): No red flags, good graph metrics
-        """
+        Scoring Algorithm:
+        - Win Rate (20 pts): 80%+ = 20, 70-79% = 15, 65-69% = 10
+        - Max Multiplier (20 pts): 100x+ = 20, 75x = 15, 50x = 10
+        - Average ROI (15 pts): 5x avg = 15, >3x = 10
+        - Trading Volume (15 pts): $100k = 15, >$50k = 10, >$15k = 5
+        - Consistency (10 pts): 30 trades = 10, >15 = 5
+        - Recency (10 pts): Profitable in last 30 days = 10
+        - Risk Flags (10 pts): No red flags = 10, 1-2 mild risks = 5
+
+        Only wallets with ≥70 score are returned
+        """</old_str>
         score = 0.0
 
-        # Win Rate scoring (25 points max)
+        # Win Rate scoring (20 points max) - NEW CRITERIA
         win_rate = analysis.get('win_rate', 0)
         if win_rate >= 80:
-            score += 25
-        elif win_rate >= 70:
             score += 20
-        elif win_rate >= 60:
+        elif win_rate >= 70:
             score += 15
-        elif win_rate >= 50:
+        elif win_rate >= 65:
             score += 10
-        elif win_rate >= 40:
-            score += 5
+        # Below 65% gets 0 points (filter requirement)
 
-        # Max Multiplier scoring (25 points max)
+        # Max Multiplier scoring (20 points max) - NEW CRITERIA
         max_multiplier = analysis.get('max_multiplier', 1)
         if max_multiplier >= 100:
-            score += 25
-        elif max_multiplier >= 50:
             score += 20
-        elif max_multiplier >= 25:
+        elif max_multiplier >= 75:
             score += 15
-        elif max_multiplier >= 10:
+        elif max_multiplier >= 50:
             score += 10
-        elif max_multiplier >= 5:
-            score += 5
+        # Below 50x gets 0 points (filter requirement)
 
-        # Volume scoring (20 points max)
+        # Average ROI scoring (15 points max) - NEW CRITERIA
+        avg_roi = analysis.get('avg_roi', 1.0)
+        if avg_roi >= 5:
+            score += 15
+        elif avg_roi >= 3:
+            score += 10
+        # Below 3x gets 0 points (filter requirement)
+
+        # Trading Volume scoring (15 points max) - NEW CRITERIA
         volume = analysis.get('total_volume_usd', 0)
         if volume >= 100000:
-            score += 20
-        elif volume >= 50000:
             score += 15
-        elif volume >= 25000:
+        elif volume >= 50000:
             score += 10
-        elif volume >= 10000:
+        elif volume >= 15000:
             score += 5
+        # Below $15k gets 0 points (filter requirement)
 
-        # Consistency scoring (15 points max)
+        # Consistency scoring (10 points max) - NEW CRITERIA
         tokens_traded = analysis.get('tokens_traded', 0)
-        avg_hold_time = analysis.get('avg_hold_time', 0)
-
-        if tokens_traded >= 20:
-            score += 8
-        elif tokens_traded >= 10:
+        if tokens_traded >= 30:
+            score += 10
+        elif tokens_traded >= 15:
             score += 5
-        elif tokens_traded >= 5:
-            score += 3
+        # Below 15 trades gets 0 points (filter requirement)
 
-        # Reasonable hold times (not day trading, not holding forever)
-        if 1 <= avg_hold_time <= 30:  # 1-30 days is good
-            score += 7
-        elif 0.1 <= avg_hold_time <= 90:  # Acceptable range
-            score += 4
+        # Recency scoring (10 points max) - NEW CRITERIA
+        trades_last_30_days = analysis.get('trades_last_30_days', 0)
+        recent_roi_positive = analysis.get('recent_roi_positive', False)
+        
+        if trades_last_30_days >= 3 and recent_roi_positive:
+            score += 10
+        elif trades_last_30_days >= 3:
+            score += 5
 
-        # Risk Assessment (15 points max)
+        # Risk Flags scoring (10 points max) - NEW CRITERIA
         risk_flags = analysis.get('risk_flags', [])
-        graph_metrics = analysis.get('graph_metrics', {})
+        honeypot_interactions = analysis.get('honeypot_interactions', 0)
+        is_dev_wallet = analysis.get('is_dev_wallet', False)
+        is_blacklisted = analysis.get('is_blacklisted', False)
 
-        # Penalty for risk flags
-        risk_penalty = len(risk_flags) * 3
-        score -= risk_penalty
+        # Automatic disqualification for major risks
+        if is_blacklisted or is_dev_wallet or honeypot_interactions > 2:
+            return 0  # Immediate disqualification
 
-        # Bonus for good graph metrics
-        centrality = graph_metrics.get('centrality', 0)
-        cluster_size = graph_metrics.get('cluster_size', 1)
-
-        if not graph_metrics.get('is_dev_involved', False):
+        # Risk scoring
+        if len(risk_flags) == 0:
+            score += 10
+        elif len(risk_flags) <= 2:
             score += 5
 
-        if centrality > 0.05:
-            score += 5
+        # Bonus for network intelligence
+        centrality = analysis.get('network_centrality', 0)
+        connected_wallets = analysis.get('connected_wallets', 0)
+        is_copycat = analysis.get('is_copycat', False)
 
-        if cluster_size > 10:
+        if centrality > 0.1 and not is_copycat:
             score += 5
+        
+        if connected_wallets > 5 and not is_copycat:
+            score += 3
 
         return max(0, min(100, score))
 
-    def _meets_criteria_fallback(self, trader_data: Dict) -> bool:
-        """Check if trader meets minimum criteria for top trader status (Original Logic)"""
-        return (
-            trader_data['win_rate'] >= self.min_win_rate and
-            trader_data['max_multiplier'] >= self.min_multiplier and
-            trader_data['tokens_traded'] >= self.min_trades and
-            trader_data['total_volume_usd'] >= self.min_volume_usd and
-            'DEV_WALLET' not in trader_data.get('risk_flags', []) and
-            trader_data['score'] >= 40  # Minimum score threshold
+    def _meets_comprehensive_criteria(self, trader_data: Dict) -> bool:
+        """Check if trader meets comprehensive criteria for top trader status"""
+        # Performance filters (must meet ALL)
+        performance_check = (
+            trader_data.get('win_rate', 0) >= 65 and  # >65% win rate
+            trader_data.get('max_multiplier', 0) >= 50 and  # ≥50x multiplier
+            trader_data.get('avg_roi', 0) >= 3 and  # >3x average ROI
+            trader_data.get('total_volume_usd', 0) >= 15000 and  # >$15k volume
+            trader_data.get('tokens_traded', 0) >= 15  # >15 trades
         )
+        
+        # Activity filters
+        activity_check = (
+            trader_data.get('trades_last_30_days', 0) >= 3 and  # ≥3 trades in 30 days
+            trader_data.get('recent_roi_positive', False)  # Positive recent ROI
+        )
+        
+        # Safety filters
+        safety_check = (
+            not trader_data.get('is_blacklisted', False) and
+            not trader_data.get('is_dev_wallet', False) and
+            trader_data.get('honeypot_interactions', 0) <= 1 and  # Max 1 honeypot interaction
+            not trader_data.get('is_copycat', False)
+        )
+        
+        # Minimum score requirement
+        score_check = trader_data.get('score', 0) >= 70
+        
+        return performance_check and activity_check and safety_check and score_check
 
     async def _discover_connected_traders(self, seed_traders: List[Dict]) -> List[str]:
         """Discover new traders through graph analysis of top performers"""
