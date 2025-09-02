@@ -97,6 +97,234 @@ class AddressFormatter:
     
     @classmethod
     def create_wallet_action_buttons(cls, wallet_address: str, chain: str = 'ethereum', 
+
+def format_wallet_analysis(analysis: Dict) -> Tuple[str, InlineKeyboardMarkup]:
+    """Format wallet analysis results for Telegram"""
+    try:
+        address = analysis['address']
+        short_addr = f"{address[:8]}...{address[-6:]}"
+        
+        # Main analysis info
+        message = f"🔍 **Wallet Analysis: `{short_addr}`**\n\n"
+        
+        # Score and classification
+        score = analysis['score']
+        classification = analysis['classification']
+        
+        if classification == "Safe":
+            score_emoji = "🟢"
+        elif classification == "Watch":
+            score_emoji = "🟡"
+        else:
+            score_emoji = "🔴"
+        
+        message += f"{score_emoji} **Score:** {score}/100 ({classification})\n\n"
+        
+        # Trading metrics
+        message += f"📊 **Trading Performance:**\n"
+        message += f"• Max multiplier: {analysis['max_multiplier']:.1f}x\n"
+        message += f"• Win rate: {analysis['win_rate']:.1f}%\n"
+        message += f"• Avg hold: {analysis['avg_hold_time']:.1f} days\n"
+        message += f"• Tokens traded: {analysis['tokens_traded']}\n"
+        message += f"• Total volume: ${analysis['total_volume_usd']:,.0f}\n\n"
+        
+        # Top profitable tokens
+        top_tokens = analysis.get('top_tokens', [])
+        if top_tokens:
+            message += f"💰 **Top Profitable Tokens:**\n"
+            for i, token in enumerate(top_tokens[:3], 1):
+                profit_mult = token.get('profit_multiplier', 1)
+                usd_gain = token.get('usd_gain', 0)
+                message += f"{i}. {token['symbol']}: {profit_mult:.1f}x (${usd_gain:,.0f})\n"
+            message += "\n"
+        
+        # Graph metrics
+        graph_metrics = analysis.get('graph_metrics', {})
+        message += f"🌐 **Network Analysis:**\n"
+        message += f"• Cluster size: {graph_metrics.get('cluster_size', 0)} addresses\n"
+        message += f"• Funding sources: {graph_metrics.get('funding_sources', 0)}\n"
+        message += f"• Centrality: {graph_metrics.get('centrality', 0):.3f}\n"
+        
+        if graph_metrics.get('is_dev_involved'):
+            message += f"⚠️ Dev/founder patterns detected\n"
+        
+        message += "\n"
+        
+        # Risk flags
+        risk_flags = analysis.get('risk_flags', [])
+        if risk_flags:
+            message += f"⚠️ **Risk Flags:** {', '.join(risk_flags)}\n\n"
+        
+        # Top counterparties
+        counterparties = analysis.get('top_counterparties', [])
+        if counterparties:
+            message += f"🤝 **Top Counterparties:**\n"
+            for i, cp in enumerate(counterparties[:3], 1):
+                cp_short = f"{cp['address'][:8]}...{cp['address'][-6:]}"
+                cex_flag = " (CEX)" if cp.get('is_cex') else ""
+                message += f"{i}. `{cp_short}`{cex_flag} - ${cp['volume_usd']:,.0f}\n"
+        
+        # Analysis timestamp
+        timestamp = analysis.get('analysis_timestamp', '')
+        if timestamp:
+            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            message += f"\n🕐 Analyzed: {dt.strftime('%Y-%m-%d %H:%M')} UTC"
+        
+        # Create inline buttons
+        buttons = [
+            [
+                InlineKeyboardButton("👥 Follow Wallet", callback_data=f"follow_{address}"),
+                InlineKeyboardButton("📋 Add to Watchlist", callback_data=f"watchlist_add_{address}")
+            ]
+        ]
+        
+        # Add counterparty analysis buttons
+        if counterparties:
+            for cp in counterparties[:2]:
+                cp_short = f"{cp['address'][:6]}..."
+                buttons.append([
+                    InlineKeyboardButton(f"🔍 Analyze {cp_short}", callback_data=f"analyze_{cp['address']}")
+                ])
+        
+        buttons.extend([
+            [InlineKeyboardButton("📋 Copy Address", callback_data=f"copy_{address}")],
+            [InlineKeyboardButton("🔍 View on Explorer", url=get_explorer_url(address, analysis.get('chain', 'ethereum')))]
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(buttons)
+        
+        return message, reply_markup
+        
+    except Exception as e:
+        logger.error(f"Failed to format wallet analysis: {e}")
+        return f"❌ Analysis formatting failed: {e}", None
+
+
+def format_token_security(analysis: Dict) -> Tuple[str, InlineKeyboardMarkup]:
+    """Format token security analysis for Telegram"""
+    try:
+        contract = analysis['contract_address']
+        short_contract = f"{contract[:8]}...{contract[-6:]}"
+        
+        token_data = analysis.get('token_data', {})
+        name = token_data.get('name', 'Unknown')
+        symbol = token_data.get('symbol', 'UNK')
+        
+        # Header
+        message = f"🔒 **Token Security: {name} ({symbol})**\n"
+        message += f"📍 `{short_contract}`\n\n"
+        
+        # Risk assessment
+        is_honeypot = analysis.get('is_honeypot', False)
+        risk_score = analysis.get('risk_score', 0)
+        risk_flags = analysis.get('risk_flags', [])
+        
+        if is_honeypot:
+            message += f"⚠️ **HONEYPOT DETECTED** 🚨\n\n"
+        elif risk_score >= 70:
+            message += f"🔴 **HIGH RISK** (Score: {risk_score}/100)\n\n"
+        elif risk_score >= 40:
+            message += f"🟡 **MEDIUM RISK** (Score: {risk_score}/100)\n\n"
+        else:
+            message += f"🟢 **LOW RISK** (Score: {risk_score}/100)\n\n"
+        
+        # Honeypot test results
+        honeypot_result = analysis.get('honeypot_result', {})
+        if honeypot_result:
+            simulation_passed = honeypot_result.get('simulation_passed', False)
+            message += f"🧪 **Honeypot Test:** {'✅ PASSED' if simulation_passed else '❌ FAILED'}\n"
+            
+            if not simulation_passed:
+                error_msg = honeypot_result.get('error_message', 'Unknown error')
+                message += f"   Error: {error_msg}\n"
+            
+            buy_tax = honeypot_result.get('buy_tax', 0)
+            sell_tax = honeypot_result.get('sell_tax', 0)
+            if buy_tax > 0 or sell_tax > 0:
+                message += f"   Buy tax: {buy_tax}% | Sell tax: {sell_tax}%\n"
+            
+            message += "\n"
+        
+        # Liquidity analysis
+        liquidity_data = analysis.get('liquidity_data', {})
+        if liquidity_data:
+            total_liquidity = liquidity_data.get('total_liquidity_usd', 0)
+            message += f"💧 **Liquidity:** ${total_liquidity:,.0f}\n"
+            
+            if total_liquidity < 5000:
+                message += f"   ⚠️ LOW LIQUIDITY WARNING\n"
+            
+            is_locked = liquidity_data.get('liquidity_locked', False)
+            message += f"   Lock status: {'🔒 Locked' if is_locked else '🔓 Unlocked'}\n\n"
+        
+        # Ownership analysis
+        ownership_data = analysis.get('ownership_data', {})
+        if ownership_data:
+            owner_pct = ownership_data.get('owner_percentage', 0)
+            is_renounced = ownership_data.get('renounced', False)
+            
+            message += f"👑 **Ownership:**\n"
+            message += f"   Owner holds: {owner_pct:.1f}%\n"
+            message += f"   Renounced: {'✅ Yes' if is_renounced else '❌ No'}\n\n"
+        
+        # Risk flags
+        if risk_flags:
+            message += f"⚠️ **Risk Flags:**\n"
+            for flag in risk_flags:
+                flag_emoji = {
+                    'HONEYPOT': '🍯',
+                    'LOW_LIQUIDITY': '💧',
+                    'LIQUIDITY_RISK': '🌊',
+                    'DEV_CONTROL': '👑',
+                    'UNVERIFIED_CODE': '❓',
+                    'HIGH_TAX': '💸'
+                }.get(flag, '⚠️')
+                message += f"   {flag_emoji} {flag.replace('_', ' ').title()}\n"
+            message += "\n"
+        
+        # Recommendation
+        recommendation = analysis.get('recommendation', 'UNKNOWN')
+        rec_emoji = {
+            'BUY': '🟢',
+            'HOLD': '🟡', 
+            'WATCH': '👀',
+            'AVOID': '🔴'
+        }.get(recommendation, '❓')
+        
+        message += f"{rec_emoji} **Recommendation: {recommendation}**\n\n"
+        
+        # Analysis timestamp
+        timestamp = analysis.get('analysis_timestamp', '')
+        if timestamp:
+            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            message += f"🕐 Analyzed: {dt.strftime('%Y-%m-%d %H:%M')} UTC"
+        
+        # Create inline buttons
+        buttons = []
+        
+        if is_honeypot or 'HONEYPOT' in risk_flags:
+            buttons.append([
+                InlineKeyboardButton("🚫 Add to Blacklist", callback_data=f"blacklist_{contract}")
+            ])
+        else:
+            buttons.append([
+                InlineKeyboardButton("📋 Add to Watchlist", callback_data=f"watchlist_add_{contract}"),
+                InlineKeyboardButton("💰 Quick Buy", callback_data=f"quick_buy_{contract}")
+            ])
+        
+        buttons.extend([
+            [InlineKeyboardButton("📋 Copy Contract", callback_data=f"copy_{contract}")],
+            [InlineKeyboardButton("🔍 View on Explorer", url=get_explorer_url(contract, analysis.get('chain', 'ethereum')))]
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(buttons)
+        
+        return message, reply_markup
+        
+    except Exception as e:
+        logger.error(f"Failed to format token security: {e}")
+        return f"❌ Security analysis formatting failed: {e}", None
+
                                    extra_buttons: List[Tuple[str, str]] = None) -> InlineKeyboardMarkup:
         """Create action buttons for wallet addresses"""
         keyboard = []

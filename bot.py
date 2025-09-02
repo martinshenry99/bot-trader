@@ -5,12 +5,22 @@ from datetime import datetime, timedelta
 from typing import Dict
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from web3 import Web3
+
 from config import Config
-from db import create_tables, get_db_session, User, Wallet, Token, Trade, AlertConfig, BlacklistEntry, WalletWatch
+from db import create_tables, get_db_session, User, Wallet, Token, Trade, AlertConfig, BlacklistEntry, WalletWatch, ExecutorWallet
 from monitor import EnhancedMonitoringManager
 from analyzer import EnhancedTokenAnalyzer
 from executor import AdvancedTradeExecutor, KeystoreManager
 from pro_features import ProFeaturesManager
+from services.wallet_analyzer import wallet_analyzer
+from core.wallet_manager import wallet_manager
+from utils.formatting import format_token_analysis, format_price_alert, format_wallet_analysis, format_token_security
+from utils.bot_helpers import (
+    check_rate_limit, is_token_contract, add_to_watchlist, remove_from_watchlist,
+    get_user_watchlist, rename_watchlist_item, get_user_executor_wallets,
+    get_wallet_balance, get_executor_wallet, get_explorer_url, generate_executor_wallet
+)
 
 # Configure logging
 logging.basicConfig(
@@ -27,14 +37,14 @@ class MemeTraderBot:
         self.executor = AdvancedTradeExecutor()
         self.pro_features = ProFeaturesManager()
         self.user_sessions = {}  # Track user sessions for multi-step operations
-        
+
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command with main menu"""
         user_id = str(update.effective_user.id)
-        
+
         # Ensure user exists in database
         await self.ensure_user_exists(user_id, update.effective_user)
-        
+
         # Show main menu
         await self.show_main_menu(update.message or update.callback_query, user_id)
 
@@ -42,9 +52,9 @@ class MemeTraderBot:
         """Show the main menu interface"""
         try:
             from ui.main_menu import MainMenu
-            
+
             menu_text, menu_keyboard = await MainMenu.get_main_menu(user_id)
-            
+
             # Determine if we should edit or send new message
             if hasattr(message_or_query, 'edit_text'):  # It's a callback query
                 await message_or_query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
@@ -52,7 +62,7 @@ class MemeTraderBot:
                 await message_or_query.reply_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
             else:
                 logger.error("Invalid message_or_query object")
-                
+
         except Exception as e:
             logger.error(f"Error showing main menu: {e}")
             # Fallback
@@ -84,7 +94,7 @@ class MemeTraderBot:
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command and return to main menu"""
         user_id = str(update.effective_user.id)
-        
+
         help_text = """
 📖 **MEME TRADER V4 PRO - HELP**
 
@@ -126,7 +136,7 @@ class MemeTraderBot:
 
 The Main Menu will appear after each action for easy navigation!
         """
-        
+
         # Send help and then show main menu
         await update.message.reply_text(help_text, parse_mode='Markdown')
         await self.show_main_menu(update.message, user_id)
@@ -134,7 +144,7 @@ The Main Menu will appear after each action for easy navigation!
     async def buy_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /buy command with enhanced pre-trade checks"""
         user_id = str(update.effective_user.id)
-        
+
         if len(context.args) < 3:
             await update.message.reply_text(
                 "💰 **Buy Token Command**\n\n"
@@ -154,25 +164,25 @@ The Main Menu will appear after each action for easy navigation!
                 parse_mode='Markdown'
             )
             return
-        
+
         chain = context.args[0].lower()
         token_address = context.args[1]
-        
+
         try:
             amount_usd = float(context.args[2])
         except ValueError:
             await update.message.reply_text("❌ Invalid amount. Please enter a numeric value.")
             return
-        
+
         if amount_usd <= 0:
             await update.message.reply_text("❌ Amount must be greater than 0.")
             return
-        
+
         # Validate chain
         if chain not in ['eth', 'bsc']:
             await update.message.reply_text("❌ Unsupported chain. Use 'eth' or 'bsc'.")
             return
-        
+
         # Show loading message
         loading_msg = await update.message.reply_text("🔄 **Analyzing token & preparing trade...**\n\n"
                                                     "⏳ Running comprehensive checks:\n"
@@ -181,15 +191,15 @@ The Main Menu will appear after each action for easy navigation!
                                                     "• Gas estimation & optimization\n"
                                                     "• AI risk assessment\n\n"
                                                     "This may take 10-15 seconds...")
-        
+
         try:
             # Perform comprehensive pre-trade analysis
             analysis_result = await self.perform_pre_trade_analysis(token_address, chain, amount_usd, 'buy')
-            
+
             if not analysis_result['success']:
                 await loading_msg.edit_text(f"❌ **Pre-trade Analysis Failed**\n\n{analysis_result['error']}")
                 return
-            
+
             # Create trade session
             session_id = f"{user_id}_{token_address}_{int(asyncio.get_event_loop().time())}"
             self.user_sessions[session_id] = {
@@ -201,10 +211,10 @@ The Main Menu will appear after each action for easy navigation!
                 'analysis': analysis_result,
                 'timestamp': asyncio.get_event_loop().time()
             }
-            
+
             # Show pre-trade confirmation
             await self.show_pre_trade_confirmation(loading_msg, analysis_result, session_id)
-            
+
         except Exception as e:
             logger.error(f"Buy command error: {e}")
             await loading_msg.edit_text(f"❌ **Buy Analysis Failed**\n\nError: {str(e)}")
@@ -212,12 +222,12 @@ The Main Menu will appear after each action for easy navigation!
     async def sell_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /sell command with P&L tracking and token selection"""
         user_id = str(update.effective_user.id)
-        
+
         # If no arguments, show token selection
         if len(context.args) == 0:
             await self._show_token_selection_for_sell(update, user_id)
             return
-        
+
         if len(context.args) < 3:
             await update.message.reply_text(
                 "💸 **Sell Token Command**\n\n"
@@ -237,25 +247,25 @@ The Main Menu will appear after each action for easy navigation!
                 parse_mode='Markdown'
             )
             return
-        
+
         chain = context.args[0].lower()
         token_address = context.args[1]
-        
+
         try:
             percentage = float(context.args[2])
         except ValueError:
             await update.message.reply_text("❌ Invalid percentage. Please enter a numeric value.")
             return
-        
+
         if percentage <= 0 or percentage > 100:
             await update.message.reply_text("❌ Percentage must be between 1 and 100.")
             return
-        
+
         # Validate chain
         if chain not in ['eth', 'bsc', 'sol']:
             await update.message.reply_text("❌ Unsupported chain. Use 'eth', 'bsc', or 'sol'.")
             return
-        
+
         # Show loading message with enhanced info
         loading_msg = await update.message.reply_text("🔄 **Analyzing holdings & preparing sell order...**\n\n"
                                                     "⏳ Calculating:\n"
@@ -264,15 +274,15 @@ The Main Menu will appear after each action for easy navigation!
                                                     "• Optimal sell strategy & timing\n"
                                                     "• Gas estimation & optimization\n\n"
                                                     "This may take 10-15 seconds...")
-        
+
         try:
             # Perform pre-sell analysis with enhanced USD calculations
             analysis_result = await self.perform_pre_trade_analysis(token_address, chain, percentage, 'sell')
-            
+
             if not analysis_result['success']:
                 await loading_msg.edit_text(f"❌ **Pre-sell Analysis Failed**\n\n{analysis_result['error']}")
                 return
-            
+
             # Create trade session
             session_id = f"{user_id}_{token_address}_{int(asyncio.get_event_loop().time())}"
             self.user_sessions[session_id] = {
@@ -284,10 +294,10 @@ The Main Menu will appear after each action for easy navigation!
                 'analysis': analysis_result,
                 'timestamp': asyncio.get_event_loop().time()
             }
-            
+
             # Show pre-trade confirmation with P&L
             await self.show_sell_confirmation(loading_msg, analysis_result, session_id)
-            
+
         except Exception as e:
             logger.error(f"Sell command error: {e}")
             await loading_msg.edit_text(f"❌ **Sell Analysis Failed**\n\nError: {str(e)}")
@@ -298,13 +308,13 @@ The Main Menu will appear after each action for easy navigation!
             # Get user's portfolio
             from core.trading_engine import trading_engine
             portfolio = await trading_engine.get_portfolio_summary(user_id)
-            
+
             if 'error' in portfolio:
                 await update.message.reply_text(f"❌ **Portfolio Error**\n\n{portfolio['error']}")
                 return
-            
+
             positions = portfolio.get('positions', [])
-            
+
             if not positions:
                 message = """
 💸 **Sell Tokens**
@@ -322,49 +332,49 @@ Start building your portfolio with smart buys! 📈
                 """
                 await update.message.reply_text(message, parse_mode='Markdown')
                 return
-            
+
             # Format holdings for selection
             message = f"💸 **Select Token to Sell**\n\n**Your Holdings ({len(positions)} tokens):**\n\n"
-            
+
             keyboard = []
             for i, position in enumerate(positions[:10], 1):  # Show max 10
                 token_symbol = position.get('token_symbol', 'UNKNOWN')
                 current_value = position.get('current_value_usd', 0)
                 pnl_usd = position.get('pnl_usd', 0)
                 pnl_pct = position.get('pnl_percentage', 0)
-                
+
                 # Format display
                 pnl_emoji = "🟢" if pnl_usd >= 0 else "🔴"
                 pnl_sign = "+" if pnl_usd >= 0 else ""
-                
+
                 message += f"{i}. **{token_symbol}**\n"
                 message += f"   Value: ${current_value:,.2f}\n"
                 message += f"   P&L: {pnl_emoji} {pnl_sign}${pnl_usd:,.2f} ({pnl_sign}{pnl_pct:.1f}%)\n\n"
-                
+
                 # Add button for this token
                 token_address = position.get('token_address', '')
                 keyboard.append([InlineKeyboardButton(
-                    f"💸 Sell {token_symbol}", 
+                    f"💸 Sell {token_symbol}",
                     callback_data=f"sell_token_{token_address[:10]}_{i}"
                 )])
-            
+
             if len(positions) > 10:
                 message += f"... and {len(positions) - 10} more tokens\n\n"
-            
+
             message += "**Total Portfolio Value:** ${:,.2f}\n".format(portfolio.get('portfolio_value_usd', 0))
             message += "\nSelect a token to sell, or use the command format:\n"
             message += "`/sell [chain] [token_address] [percentage]`"
-            
+
             # Add utility buttons
             keyboard.extend([
                 [InlineKeyboardButton("📊 Full Portfolio", callback_data="view_portfolio")],
                 [InlineKeyboardButton("🚨 Sell All (Panic)", callback_data="panic_sell_confirm")],
                 [InlineKeyboardButton("🔄 Refresh", callback_data="refresh_holdings")]
             ])
-            
+
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Token selection error: {e}")
             await update.message.reply_text(f"❌ **Selection Error**\n\nFailed to load holdings: {str(e)}")
@@ -376,10 +386,10 @@ Start building your portfolio with smart buys! 📈
             token_address = session['token_address']
             percentage = session['percentage']
             chain = session['chain']
-            
+
             # Get enhanced P&L information
             pnl_info = analysis_result.get('pnl_analysis', {})
-            
+
             confirmation_text = f"""
 💸 **SELL ORDER CONFIRMATION**
 
@@ -409,7 +419,7 @@ Start building your portfolio with smart buys! 📈
 
 **Ready to execute this sell order?**
             """
-            
+
             # Create confirmation buttons
             keyboard = [
                 [InlineKeyboardButton("✅ Execute Sell", callback_data=f"confirm_trade_{session_id}")],
@@ -417,9 +427,9 @@ Start building your portfolio with smart buys! 📈
                 [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_trade_{session_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             await message.edit_text(confirmation_text, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Error showing sell confirmation: {e}")
             await message.edit_text(f"❌ Error displaying sell confirmation: {str(e)}")
@@ -427,7 +437,7 @@ Start building your portfolio with smart buys! 📈
     async def sell_command_old(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /sell command with P&L tracking"""
         user_id = str(update.effective_user.id)
-        
+
         if len(context.args) < 3:
             await update.message.reply_text(
                 "💸 **Sell Token Command**\n\n"
@@ -446,25 +456,25 @@ Start building your portfolio with smart buys! 📈
                 parse_mode='Markdown'
             )
             return
-        
+
         chain = context.args[0].lower()
         token_address = context.args[1]
-        
+
         try:
             percentage = float(context.args[2])
         except ValueError:
             await update.message.reply_text("❌ Invalid percentage. Please enter a numeric value.")
             return
-        
+
         if percentage <= 0 or percentage > 100:
             await update.message.reply_text("❌ Percentage must be between 1 and 100.")
             return
-        
+
         # Validate chain
         if chain not in ['eth', 'bsc']:
             await update.message.reply_text("❌ Unsupported chain. Use 'eth' or 'bsc'.")
             return
-        
+
         # Show loading message
         loading_msg = await update.message.reply_text("🔄 **Analyzing holdings & preparing sell order...**\n\n"
                                                     "⏳ Calculating:\n"
@@ -473,15 +483,15 @@ Start building your portfolio with smart buys! 📈
                                                     "• Optimal sell strategy\n"
                                                     "• Gas estimation & timing\n\n"
                                                     "This may take 10-15 seconds...")
-        
+
         try:
             # Perform pre-sell analysis
             analysis_result = await self.perform_pre_trade_analysis(token_address, chain, percentage, 'sell')
-            
+
             if not analysis_result['success']:
                 await loading_msg.edit_text(f"❌ **Pre-sell Analysis Failed**\n\n{analysis_result['error']}")
                 return
-            
+
             # Create trade session
             session_id = f"{user_id}_{token_address}_{int(asyncio.get_event_loop().time())}"
             self.user_sessions[session_id] = {
@@ -493,10 +503,10 @@ Start building your portfolio with smart buys! 📈
                 'analysis': analysis_result,
                 'timestamp': asyncio.get_event_loop().time()
             }
-            
+
             # Show pre-trade confirmation
             await self.show_pre_trade_confirmation(loading_msg, analysis_result, session_id)
-            
+
         except Exception as e:
             logger.error(f"Sell command error: {e}")
             await loading_msg.edit_text(f"❌ **Sell Analysis Failed**\n\nError: {str(e)}")
@@ -504,7 +514,7 @@ Start building your portfolio with smart buys! 📈
     async def panic_sell_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /panic_sell command for emergency liquidation"""
         user_id = str(update.effective_user.id)
-        
+
         # Show warning and confirmation
         warning_message = """
 🚨 **PANIC SELL - EMERGENCY LIQUIDATION** 🚨
@@ -526,32 +536,32 @@ Start building your portfolio with smart buys! 📈
 
 This action is irreversible and should only be used in extreme situations.
         """
-        
+
         keyboard = [
             [InlineKeyboardButton("🚨 YES - LIQUIDATE ALL", callback_data=f"panic_sell_confirm_{user_id}")],
             [InlineKeyboardButton("❌ Cancel", callback_data=f"panic_sell_cancel_{user_id}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await update.message.reply_text(warning_message, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /scan command for manual wallet scanning"""
         user_id = str(update.effective_user.id)
-        
+
         # Show loading message
         loading_msg = await update.message.reply_text("🔍 **Manual Wallet Scan**\n\n⏳ Scanning all watched wallets across chains...\nThis may take 30-60 seconds...")
-        
+
         try:
             from services.wallet_scanner import wallet_scanner
-            
+
             # Perform manual scan
             scan_results = await wallet_scanner.manual_scan()
-            
+
             if 'error' in scan_results:
                 await loading_msg.edit_text(f"❌ **Scan Failed**\n\nError: {scan_results['error']}")
                 return
-            
+
             # Format results
             result_message = f"""
 🔍 **Manual Scan Complete**
@@ -571,16 +581,16 @@ This action is irreversible and should only be used in extreme situations.
 
 Automatic scanning continues in background every 30 seconds.
             """
-            
+
             keyboard = [
                 [InlineKeyboardButton("📈 View Leaderboard", callback_data="leaderboard")],
                 [InlineKeyboardButton("⚙️ Configure Alerts", callback_data="configure_alerts")],
                 [InlineKeyboardButton("👁️ Watchlist", callback_data="view_watchlist")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             await loading_msg.edit_text(result_message, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Scan command error: {e}")
             await loading_msg.edit_text(f"❌ **Scan Error**\n\nFailed to perform manual scan: {str(e)}")
@@ -588,25 +598,25 @@ Automatic scanning continues in background every 30 seconds.
     async def leaderboard_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /leaderboard command - show moonshot wallets"""
         user_id = str(update.effective_user.id)
-        
+
         # Show loading message
         loading_msg = await update.message.reply_text("📈 **Loading Moonshot Leaderboard...**\n\n🔍 Finding wallets with 200x+ gains...")
-        
+
         try:
             from services.wallet_scanner import wallet_scanner
-            
+
             # Get moonshot wallets
             moonshot_wallets = await wallet_scanner.get_moonshot_leaderboard()
-            
+
             if not moonshot_wallets:
                 await loading_msg.edit_text("📈 **Moonshot Leaderboard**\n\n🔍 No wallets found with 200x+ multipliers yet.\n\nKeep monitoring - the next moonshot could be discovered soon!")
                 return
-            
+
             # Format leaderboard
             leaderboard_text = "🚀 **MOONSHOT LEADERBOARD** 🚀\n\n💎 *Wallets with 200x+ gains*\n\n"
-            
+
             from utils.formatting import AddressFormatter
-            
+
             for i, wallet in enumerate(moonshot_wallets[:10], 1):
                 leaderboard_text += AddressFormatter.format_leaderboard_entry(
                     rank=i,
@@ -617,10 +627,10 @@ Automatic scanning continues in background every 30 seconds.
                     chains=wallet.chains
                 )
                 leaderboard_text += "\n"
-            
+
             leaderboard_text += f"📅 Last updated: {datetime.utcnow().strftime('%H:%M UTC')}\n"
             leaderboard_text += "🔄 Updates every 30 seconds with new discoveries"
-            
+
             keyboard = [
                 [InlineKeyboardButton("🔍 Analyze Top Wallet", callback_data=f"analyze_wallet_{moonshot_wallets[0].address[:10]}")],
                 [InlineKeyboardButton("👁️ Watch Top Wallet", callback_data=f"add_watchlist_{moonshot_wallets[0].address[:10]}")],
@@ -628,9 +638,9 @@ Automatic scanning continues in background every 30 seconds.
                 [InlineKeyboardButton("⚙️ Alert Settings", callback_data="configure_alerts")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             await loading_msg.edit_text(leaderboard_text, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Leaderboard command error: {e}")
             await loading_msg.edit_text(f"❌ **Leaderboard Error**\n\nFailed to load moonshot leaderboard: {str(e)}")
@@ -638,7 +648,7 @@ Automatic scanning continues in background every 30 seconds.
     async def alerts_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /alerts command - configure alert filters"""
         user_id = str(update.effective_user.id)
-        
+
         try:
             # Get current alert configuration
             db = get_db_session()
@@ -647,9 +657,9 @@ Automatic scanning continues in background every 30 seconds.
                 if not user:
                     await update.message.reply_text("❌ User not found. Please use /start first.")
                     return
-                
+
                 alert_config = db.query(AlertConfig).filter(AlertConfig.user_id == user.id).first()
-                
+
                 # Create default config if doesn't exist
                 if not alert_config:
                     alert_config = AlertConfig(
@@ -664,11 +674,11 @@ Automatic scanning continues in background every 30 seconds.
                     db.add(alert_config)
                     db.commit()
                     db.refresh(alert_config)
-                
+
                 # Format current settings
                 chains = alert_config.monitored_chains.split(',') if alert_config.monitored_chains else []
                 chains_display = ', '.join([c.upper() for c in chains])
-                
+
                 settings_message = f"""
 ⚙️ **Alert Configuration**
 
@@ -688,7 +698,7 @@ Automatic scanning continues in background every 30 seconds.
 
 **Configure your alert preferences below:**
                 """
-                
+
                 keyboard = [
                     [InlineKeyboardButton("💰 Min Trade Size", callback_data=f"set_min_trade_{user_id}")],
                     [InlineKeyboardButton("🔔 Alert Types", callback_data=f"alert_types_{user_id}")],
@@ -697,12 +707,12 @@ Automatic scanning continues in background every 30 seconds.
                     [InlineKeyboardButton("📊 Test Alerts", callback_data=f"test_alerts_{user_id}")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
+
                 await update.message.reply_text(settings_message, reply_markup=reply_markup, parse_mode='Markdown')
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Alerts command error: {e}")
             await update.message.reply_text(f"❌ **Alert Configuration Error**\n\nFailed to load alert settings: {str(e)}")
@@ -710,39 +720,39 @@ Automatic scanning continues in background every 30 seconds.
     async def blacklist_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /blacklist command - manage blacklisted wallets/tokens"""
         user_id = str(update.effective_user.id)
-        
+
         if len(context.args) == 0:
             # Show current blacklist
             await self._show_blacklist(update, user_id)
             return
-        
+
         action = context.args[0].lower()
-        
+
         if action == "add" and len(context.args) >= 3:
             entry_type = context.args[1].lower()  # 'wallet' or 'token'
             address = context.args[2]
             reason = ' '.join(context.args[3:]) if len(context.args) > 3 else "Manual addition"
-            
+
             if entry_type not in ['wallet', 'token']:
                 await update.message.reply_text("❌ Invalid type. Use 'wallet' or 'token'.")
                 return
-            
+
             success = await self._add_to_blacklist(user_id, entry_type, address, reason)
-            
+
             if success:
                 await update.message.reply_text(f"✅ Added {entry_type} `{address[:16]}...` to blacklist.\n\nReason: {reason}", parse_mode='Markdown')
             else:
                 await update.message.reply_text("❌ Failed to add to blacklist.")
-                
+
         elif action == "remove" and len(context.args) >= 2:
             address = context.args[1]
             success = await self._remove_from_blacklist(user_id, address)
-            
+
             if success:
                 await update.message.reply_text(f"✅ Removed `{address[:16]}...` from blacklist.", parse_mode='Markdown')
             else:
                 await update.message.reply_text("❌ Failed to remove from blacklist or not found.")
-                
+
         else:
             help_text = """
 🚫 **Blacklist Management**
@@ -765,42 +775,42 @@ Blacklisted entries are filtered from alerts and trading signals.
     async def watchlist_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /watchlist command - manage watched wallets"""
         user_id = str(update.effective_user.id)
-        
+
         if len(context.args) == 0:
             # Show current watchlist
             await self._show_watchlist(update, user_id)
             return
-        
+
         action = context.args[0].lower()
-        
+
         if action == "add" and len(context.args) >= 2:
             wallet_address = context.args[1]
             chains = context.args[2].split(',') if len(context.args) > 2 else ['ethereum']
             wallet_name = ' '.join(context.args[3:]) if len(context.args) > 3 else None
-            
+
             # Validate address format
             if not self._validate_wallet_address(wallet_address):
                 await update.message.reply_text("❌ Invalid wallet address format.")
                 return
-            
+
             from services.wallet_scanner import wallet_scanner
             success = await wallet_scanner.add_wallet_to_watchlist(wallet_address, int(user_id), chains)
-            
+
             if success:
                 chains_str = ', '.join([c.upper() for c in chains])
                 await update.message.reply_text(f"✅ Added wallet to watchlist:\n\n**Address:** `{wallet_address}`\n**Chains:** {chains_str}\n**Name:** {wallet_name or 'Unnamed'}\n\nYou'll receive alerts for this wallet's activity.", parse_mode='Markdown')
             else:
                 await update.message.reply_text("❌ Failed to add wallet to watchlist.")
-                
+
         elif action == "remove" and len(context.args) >= 2:
             wallet_address = context.args[1]
             success = await self._remove_from_watchlist(user_id, wallet_address)
-            
+
             if success:
                 await update.message.reply_text(f"✅ Removed `{wallet_address[:16]}...` from watchlist.", parse_mode='Markdown')
             else:
                 await update.message.reply_text("❌ Failed to remove from watchlist or not found.")
-                
+
         else:
             help_text = """
 👁️ **Watchlist Management**
@@ -822,10 +832,10 @@ Blacklisted entries are filtered from alerts and trading signals.
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /settings command for trading configuration"""
         user_id = str(update.effective_user.id)
-        
+
         # Get current trading engine config
         from core.trading_engine import trading_engine
-        
+
         current_config = {
             'safe_mode': trading_engine.config['safe_mode'],
             'mirror_sell_enabled': trading_engine.config['mirror_sell_enabled'],
@@ -835,7 +845,7 @@ Blacklisted entries are filtered from alerts and trading signals.
             'max_slippage': trading_engine.config['max_slippage'] * 100,  # Convert to percentage
             'min_liquidity_usd': trading_engine.config['min_liquidity_usd']
         }
-        
+
         settings_message = f"""
 ⚙️ **Trading Settings & Configuration**
 
@@ -860,7 +870,7 @@ Blacklisted entries are filtered from alerts and trading signals.
 
 Click buttons below to modify settings:
         """
-        
+
         keyboard = [
             [InlineKeyboardButton("🛡️ Toggle Safe Mode", callback_data=f"toggle_safe_mode_{user_id}")],
             [InlineKeyboardButton("🔄 Mirror Settings", callback_data=f"mirror_settings_{user_id}")],
@@ -869,13 +879,13 @@ Click buttons below to modify settings:
             [InlineKeyboardButton("❓ Help", callback_data="help")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await update.message.reply_text(settings_message, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def portfolio_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /portfolio command for portfolio summary"""
         user_id = str(update.effective_user.id)
-        
+
         # Show portfolio using the main menu system
         if update.callback_query:
             await self._handle_main_portfolio(update.callback_query, user_id)
@@ -897,7 +907,7 @@ Click buttons below to modify settings:
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /settings command for trading configuration"""
         user_id = str(update.effective_user.id)
-        
+
         # Show settings using the main menu system
         if update.callback_query:
             await self._handle_main_settings(update.callback_query, user_id)
@@ -919,21 +929,21 @@ Click buttons below to modify settings:
     async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /scan command for manual wallet scanning"""
         user_id = str(update.effective_user.id)
-        
+
         # Show loading message
         loading_msg = await update.message.reply_text("🔍 **Manual Wallet Scan**\n\n⏳ Scanning all watched wallets across chains...\nThis may take 30-60 seconds...")
-        
+
         try:
             from services.wallet_scanner import wallet_scanner
-            
+
             # Perform manual scan
             scan_results = await wallet_scanner.manual_scan()
-            
+
             if 'error' in scan_results:
                 await loading_msg.edit_text(f"❌ **Scan Failed**\n\nError: {scan_results['error']}")
                 await self.show_main_menu(loading_msg, user_id)
                 return
-            
+
             # Format results
             result_message = f"""
 🔍 **Manual Scan Complete**
@@ -948,10 +958,10 @@ Click buttons below to modify settings:
 
 ✅ **Scan completed successfully!**
             """
-            
+
             await loading_msg.edit_text(result_message, parse_mode='Markdown')
             await self.show_main_menu(loading_msg, user_id)
-            
+
         except Exception as e:
             logger.error(f"Scan command error: {e}")
             await loading_msg.edit_text(f"❌ **Scan Error**\n\nFailed to perform manual scan: {str(e)}")
@@ -960,7 +970,7 @@ Click buttons below to modify settings:
     async def leaderboard_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /leaderboard command - show moonshot wallets"""
         user_id = str(update.effective_user.id)
-        
+
         # Use the main menu leaderboard handler
         if update.callback_query:
             await self._handle_main_leaderboard(update.callback_query, user_id)
@@ -969,17 +979,17 @@ Click buttons below to modify settings:
             class PseudoQuery:
                 def __init__(self, message):
                     self.message = message
-                
+
                 async def edit_text(self, text, reply_markup=None, parse_mode=None):
                     await self.message.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
-            
+
             pseudo_query = PseudoQuery(update.message)
             await self._handle_main_leaderboard(pseudo_query, user_id)
 
     async def panic_sell_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /panic_sell command for emergency liquidation"""
         user_id = str(update.effective_user.id)
-        
+
         # Use the main menu panic sell handler
         if update.callback_query:
             await self._handle_main_panic_sell(update.callback_query, user_id)
@@ -988,17 +998,17 @@ Click buttons below to modify settings:
             class PseudoQuery:
                 def __init__(self, message):
                     self.message = message
-                
+
                 async def edit_text(self, text, reply_markup=None, parse_mode=None):
                     await self.message.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
-            
+
             pseudo_query = PseudoQuery(update.message)
             await self._handle_main_panic_sell(pseudo_query, user_id)
 
     async def buy_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /buy command with comprehensive pre-trade analysis"""
         user_id = str(update.effective_user.id)
-        
+
         if len(context.args) < 3:
             await update.message.reply_text(
                 "💰 **Buy Token Command**\n\n"
@@ -1021,21 +1031,21 @@ Click buttons below to modify settings:
             )
             await self.show_main_menu(update.message, user_id)
             return
-        
+
         # Process buy command (existing logic)
         chain = context.args[0].lower()
         token_address = context.args[1]
-        
+
         try:
             amount_usd = float(context.args[2])
         except ValueError:
             await update.message.reply_text("❌ Invalid amount. Please enter a numeric value.")
             await self.show_main_menu(update.message, user_id)
             return
-        
+
         # Show confirmation and then main menu after completion
         loading_msg = await update.message.reply_text("🔄 **Processing Buy Order...**\n\n⏳ Analyzing token and preparing trade...")
-        
+
         try:
             # Simulate trade processing
             await loading_msg.edit_text(
@@ -1046,60 +1056,90 @@ Click buttons below to modify settings:
                 f"• Amount: ${amount_usd:,.2f}\n\n"
                 f"*Trade would be executed here*"
             )
-            
+
             await self.show_main_menu(loading_msg, user_id)
-            
+
         except Exception as e:
             logger.error(f"Buy command error: {e}")
             await loading_msg.edit_text(f"❌ **Buy Order Failed**\n\nError: {str(e)}")
             await self.show_main_menu(loading_msg, user_id)
 
     async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /analyze command with enhanced analysis"""
-        if len(context.args) == 0:
-            await update.message.reply_text(
-                "🔍 **Enhanced Token Analysis**\n\n"
-                "**Usage:** `/analyze [token_address]`\n\n"
-                "**Example:**\n"
-                "`/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`\n\n"
-                "**Enhanced Features:**\n"
-                "✅ Advanced honeypot simulation\n"
-                "✅ Multi-scenario trading tests\n"
-                "✅ Contract risk assessment\n"
-                "✅ Liquidity depth analysis\n"
-                "✅ AI-powered scoring (0-10)\n"
-                "✅ Trade safety score\n"
-                "✅ Real-time risk monitoring", 
-                parse_mode='Markdown'
-            )
-            return
-        
-        token_address = context.args[0]
-        loading_msg = await update.message.reply_text("🔄 **Running Enhanced Analysis...**\n\n"
-                                                    "⏳ Comprehensive checks in progress:\n"
-                                                    "• Advanced honeypot simulation\n"
-                                                    "• Contract security analysis\n"
-                                                    "• Trading scenario testing\n"
-                                                    "• AI risk assessment\n"
-                                                    "• Market sentiment analysis\n\n"
-                                                    "This may take 15-20 seconds...")
-        
+        """Comprehensive wallet/token analysis command"""
         try:
-            analysis = await self.analyzer.analyze_token(token_address)
-            await self.show_enhanced_analysis_results(loading_msg, analysis)
-            
+            if not context.args:
+                await update.message.reply_text(
+                    "🔍 **Analyze Wallet or Token**\n\n"
+                    "**Usage:**\n"
+                    "`/analyze <address>` - Analyze wallet or token\n"
+                    "`/analyze <address> <depth>` - Deep wallet scan\n\n"
+                    "**Examples:**\n"
+                    "`/analyze 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b`\n"
+                    "`/analyze 0xwalletaddress... 4` (scan 4 hops deep)",
+                    parse_mode='Markdown'
+                )
+                return
+
+            address = context.args[0]
+            depth = int(context.args[1]) if len(context.args) > 1 else 3
+
+            # Validate address
+            if not Web3.is_address(address):
+                await update.message.reply_text("❌ Invalid address format")
+                return
+
+            # Rate limiting check
+            user_id = str(update.effective_user.id)
+            if not await check_rate_limit(user_id, 'analyze'):
+                await update.message.reply_text("⏳ Please wait before analyzing again (rate limit)")
+                return
+
+            # Show processing message
+            if depth > 2:
+                processing_msg = await update.message.reply_text(
+                    f"🔍 Deep scan in progress (depth={depth}) — this can take up to 60s. "
+                    "I will post results when ready."
+                )
+            else:
+                processing_msg = await update.message.reply_text("🔍 Analyzing... This may take a moment.")
+
+            try:
+                # Determine if it's a wallet or token contract
+                chain = 'ethereum'  # Default, could be auto-detected
+
+                # Check if it's a contract with token functions
+                is_token = await is_token_contract(address, chain)
+
+                if is_token:
+                    # Token analysis
+                    analysis = await wallet_analyzer.analyze_token(address, chain)
+                    message, buttons = format_token_security(analysis)
+                else:
+                    # Wallet analysis
+                    analysis = await wallet_analyzer.analyze_wallet(address, chain, depth)
+                    message, buttons = format_wallet_analysis(analysis)
+
+                await processing_msg.edit_text(message, reply_markup=buttons, parse_mode='Markdown')
+
+            except Exception as e:
+                error_msg = f"❌ Analysis failed: {str(e)}"
+                if "rate limit" in str(e).lower():
+                    error_msg += "\n\n⏳ API rate limit reached. Please try again in a few minutes."
+
+                await processing_msg.edit_text(error_msg)
+
         except Exception as e:
-            logger.error(f"Enhanced analysis error: {e}")
-            await loading_msg.edit_text(f"❌ **Enhanced Analysis Failed**\n\nError: {str(e)}")
+            logger.error(f"Analyze command error: {e}")
+            await update.message.reply_text("❌ Analysis failed. Please try again.")
 
     async def unified_callback_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Unified callback handler for all inline keyboard interactions"""
         query = update.callback_query
         user_id = str(query.from_user.id)
         data = query.data
-        
+
         await query.answer()
-        
+
         try:
             # Handle main menu callbacks
             if data == "main_menu":
@@ -1124,25 +1164,25 @@ Click buttons below to modify settings:
                 await self._handle_toggle_safe_mode(query, user_id)
             elif data == "main_help":
                 await self._handle_main_help(query, user_id)
-            
+
             # Handle sell percentage callbacks
             elif data.startswith('sell_'):
                 await self._handle_sell_percentage(query, data, user_id)
-            
+
             # Handle buy amount settings
             elif data.startswith('set_buy_amount_'):
                 await self._handle_set_buy_amount(query, data, user_id)
-            
+
             # Handle confirmations
             elif data.startswith('execute_'):
                 await self._handle_execute_action(query, data, user_id)
             elif data == "cancel_trade":
                 await self._handle_cancel_trade(query, user_id)
-            
+
             # Handle settings callbacks
             elif data.startswith('settings_'):
                 await self._handle_settings_callback(query, data, user_id)
-            
+
             # Handle existing advanced callback queries
             elif data.startswith('panic_sell_confirm_'):
                 await self._handle_panic_sell_confirm(query, user_id)
@@ -1159,7 +1199,7 @@ Click buttons below to modify settings:
                 await self._handle_toggle_mirror_buy(query, user_id)
             elif data.startswith('view_portfolio_') or data.startswith('refresh_portfolio_'):
                 await self._handle_portfolio_view(query, user_id)
-            
+
             # Handle enhanced action callbacks
             elif data.startswith('analyze_wallet_'):
                 wallet_prefix = data.replace('analyze_wallet_', '')
@@ -1179,8 +1219,8 @@ Click buttons below to modify settings:
             elif data.startswith('quick_buy_'):
                 token_prefix = data.replace('quick_buy_', '')
                 await self._handle_quick_buy_callback(query, token_prefix, user_id)
-            
-            # Handle legacy callbacks  
+
+            # Handle legacy callbacks
             elif data.startswith("confirm_trade_"):
                 session_id = data.replace("confirm_trade_", "")
                 await self.handle_trade_confirmation(query, session_id)
@@ -1228,7 +1268,7 @@ Click buttons below to modify settings:
             else:
                 await query.edit_message_text(f"🚧 Feature available via Main Menu!\n\nUse the buttons below for easy navigation. 🚀")
                 await self.show_main_menu(query, user_id)
-                
+
         except Exception as e:
             logger.error(f"Unified callback handler error: {e}")
             await query.edit_message_text(f"❌ Error processing request: {str(e)}")
@@ -1238,15 +1278,15 @@ Click buttons below to modify settings:
         """Handle panic sell confirmation"""
         try:
             await query.edit_message_text("🚨 **EXECUTING PANIC SELL...**\n\nLiquidating all positions. This may take 30-60 seconds...")
-            
+
             # Execute panic sell through trading engine
             from core.trading_engine import trading_engine
             result = await trading_engine.execute_panic_sell(user_id)
-            
+
             if result['success']:
                 liquidated = result.get('liquidated_count', 0)
                 total = result.get('total_positions', 0)
-                
+
                 success_message = f"""
 ✅ **PANIC SELL COMPLETED**
 
@@ -1263,7 +1303,7 @@ Your portfolio has been liquidated. Check your wallet for received funds.
                 await query.edit_message_text(success_message, parse_mode='Markdown')
             else:
                 await query.edit_message_text(f"❌ **PANIC SELL FAILED**\n\nError: {result.get('error', 'Unknown error')}")
-                
+
         except Exception as e:
             logger.error(f"Panic sell execution error: {e}")
             await query.edit_message_text(f"❌ **PANIC SELL ERROR**\n\nFailed to execute: {str(e)}")
@@ -1272,18 +1312,18 @@ Your portfolio has been liquidated. Check your wallet for received funds.
         """Handle safe mode toggle"""
         try:
             from core.trading_engine import trading_engine
-            
+
             current_mode = trading_engine.config['safe_mode']
             new_mode = not current_mode
-            
+
             result = await trading_engine.update_config(user_id, {'safe_mode': new_mode})
-            
+
             if result['success']:
                 mode_text = "ON" if new_mode else "OFF"
                 await query.edit_message_text(f"✅ Safe Mode is now **{mode_text}**\n\nSafe mode {'blocks risky trades automatically' if new_mode else 'allows all trades (use caution)'}")
             else:
                 await query.edit_message_text("❌ Failed to update safe mode setting")
-                
+
         except Exception as e:
             logger.error(f"Safe mode toggle error: {e}")
             await query.edit_message_text(f"❌ Error: {str(e)}")
@@ -1292,9 +1332,9 @@ Your portfolio has been liquidated. Check your wallet for received funds.
         """Handle mirror trading settings"""
         try:
             from core.trading_engine import trading_engine
-            
+
             current_config = trading_engine.config
-            
+
             message = f"""
 🔄 **Mirror Trading Settings**
 
@@ -1310,16 +1350,16 @@ Automatically buys tokens when tracked wallets buy (risky)
 
 Choose action:
             """
-            
+
             keyboard = [
                 [InlineKeyboardButton("🔄 Toggle Mirror Sell", callback_data=f"toggle_mirror_sell_{user_id}")],
                 [InlineKeyboardButton("🔄 Toggle Mirror Buy", callback_data=f"toggle_mirror_buy_{user_id}")],
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data=f"settings_{user_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Mirror settings error: {e}")
             await query.edit_message_text(f"❌ Error: {str(e)}")
@@ -1328,18 +1368,18 @@ Choose action:
         """Handle mirror sell toggle"""
         try:
             from core.trading_engine import trading_engine
-            
+
             current_state = trading_engine.config['mirror_sell_enabled']
             new_state = not current_state
-            
+
             result = await trading_engine.update_config(user_id, {'mirror_sell_enabled': new_state})
-            
+
             if result['success']:
                 state_text = "ON" if new_state else "OFF"
                 await query.edit_message_text(f"✅ Mirror Sell is now **{state_text}**\n\n{'Automatic selling when tracked wallets sell' if new_state else 'Manual selling only'}")
             else:
                 await query.edit_message_text("❌ Failed to update mirror sell setting")
-                
+
         except Exception as e:
             logger.error(f"Mirror sell toggle error: {e}")
             await query.edit_message_text(f"❌ Error: {str(e)}")
@@ -1348,19 +1388,19 @@ Choose action:
         """Handle mirror buy toggle"""
         try:
             from core.trading_engine import trading_engine
-            
+
             current_state = trading_engine.config['mirror_buy_enabled']
             new_state = not current_state
-            
+
             result = await trading_engine.update_config(user_id, {'mirror_buy_enabled': new_state})
-            
+
             if result['success']:
                 state_text = "ON" if new_state else "OFF"
                 warning = "\n\n⚠️ **WARNING:** Auto-buy is risky! Only enable if you trust your tracked wallets." if new_state else ""
                 await query.edit_message_text(f"✅ Mirror Buy is now **{state_text}**\n\n{'Automatic buying when tracked wallets buy' if new_state else 'Manual buy alerts only'}{warning}")
             else:
                 await query.edit_message_text("❌ Failed to update mirror buy setting")
-                
+
         except Exception as e:
             logger.error(f"Mirror buy toggle error: {e}")
             await query.edit_message_text(f"❌ Error: {str(e)}")
@@ -1376,7 +1416,7 @@ Choose action:
 
 **Main Commands:**
 /buy - Execute buy orders
-/sell - Execute sell orders  
+/sell - Execute sell orders
 /panic_sell - Emergency liquidation
 /portfolio - View portfolio summary
 /settings - Trading configuration
@@ -1392,7 +1432,7 @@ Need detailed help? Use /help command.
         await query.edit_message_text(help_text, parse_mode='Markdown')
 
     # === MAIN MENU CALLBACK HANDLERS ===
-    
+
     async def _handle_main_portfolio(self, query, user_id: str):
         """Handle main menu portfolio button"""
         try:
@@ -1403,7 +1443,7 @@ Need detailed help? Use /help command.
             logger.error(f"Main portfolio error: {e}")
             await query.edit_message_text("❌ Error loading portfolio")
             await self.show_main_menu(query, user_id)
-    
+
     async def _handle_main_scan(self, query, user_id: str):
         """Handle main menu scan button"""
         try:
@@ -1414,7 +1454,7 @@ Need detailed help? Use /help command.
             logger.error(f"Main scan error: {e}")
             await query.edit_message_text("❌ Error loading scan menu")
             await self.show_main_menu(query, user_id)
-    
+
     async def _handle_main_buy(self, query, user_id: str):
         """Handle main menu buy button"""
         await query.edit_message_text(
@@ -1428,18 +1468,18 @@ Need detailed help? Use /help command.
             parse_mode='Markdown'
         )
         await self.show_main_menu(query, user_id)
-    
+
     async def _handle_main_sell(self, query, user_id: str):
         """Handle main menu sell button - show portfolio with sell options"""
         await self._handle_main_portfolio(query, user_id)
-    
+
     async def _handle_main_leaderboard(self, query, user_id: str):
         """Handle main menu leaderboard button"""
         try:
             # Reuse existing leaderboard command logic
             from services.wallet_scanner import wallet_scanner
             moonshot_wallets = await wallet_scanner.get_moonshot_leaderboard()
-            
+
             if not moonshot_wallets:
                 await query.edit_message_text(
                     "📈 **Moonshot Leaderboard**\n\n"
@@ -1448,12 +1488,12 @@ Need detailed help? Use /help command.
                 )
                 await self.show_main_menu(query, user_id)
                 return
-            
+
             # Format leaderboard with enhanced formatting
             leaderboard_text = "🚀 **MOONSHOT LEADERBOARD** 🚀\n\n💎 *Wallets with 200x+ gains*\n\n"
-            
+
             from utils.formatting import AddressFormatter
-            
+
             for i, wallet in enumerate(moonshot_wallets[:10], 1):
                 leaderboard_text += AddressFormatter.format_leaderboard_entry(
                     rank=i,
@@ -1464,9 +1504,9 @@ Need detailed help? Use /help command.
                     chains=wallet.chains
                 )
                 leaderboard_text += "\n"
-            
+
             leaderboard_text += f"📅 Last updated: {datetime.utcnow().strftime('%H:%M UTC')}"
-            
+
             keyboard = [
                 [InlineKeyboardButton("🔍 Analyze Top Wallet", callback_data=f"analyze_wallet_{moonshot_wallets[0].address[:10]}")],
                 [InlineKeyboardButton("👁️ Watch Top Wallet", callback_data=f"add_watchlist_{moonshot_wallets[0].address[:10]}")],
@@ -1474,36 +1514,36 @@ Need detailed help? Use /help command.
                 [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             await query.edit_text(leaderboard_text, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Main leaderboard error: {e}")
             await query.edit_message_text("❌ Error loading leaderboard")
             await self.show_main_menu(query, user_id)
-    
+
     async def _handle_main_panic_sell(self, query, user_id: str):
         """Handle main menu panic sell button"""
         try:
             from ui.main_menu import MainMenu
             from core.trading_engine import trading_engine
-            
+
             # Get portfolio for confirmation details
             portfolio = await trading_engine.get_portfolio_summary(user_id)
-            
+
             confirmation_details = {
                 'total_value': portfolio.get('portfolio_value_usd', 0),
                 'position_count': portfolio.get('position_count', 0)
             }
-            
+
             message, keyboard = MainMenu.create_confirmation_popup("panic_sell", confirmation_details)
             await query.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Main panic sell error: {e}")
             await query.edit_message_text("❌ Error preparing panic sell")
             await self.show_main_menu(query, user_id)
-    
+
     async def _handle_main_settings(self, query, user_id: str):
         """Handle main menu settings button"""
         try:
@@ -1514,7 +1554,7 @@ Need detailed help? Use /help command.
             logger.error(f"Main settings error: {e}")
             await query.edit_message_text("❌ Error loading settings")
             await self.show_main_menu(query, user_id)
-    
+
     async def _handle_main_help(self, query, user_id: str):
         """Handle main menu help button"""
         help_text = """
@@ -1544,12 +1584,12 @@ Need detailed help? Use /help command.
 
 **📱 The Main Menu makes everything easy!**
         """
-        
+
         await query.edit_message_text(help_text, parse_mode='Markdown')
         await self.show_main_menu(query, user_id)
-    
+
     # === SELL PERCENTAGE HANDLERS ===
-    
+
     async def _handle_sell_percentage(self, query, data: str, user_id: str):
         """Handle sell percentage buttons"""
         try:
@@ -1557,10 +1597,10 @@ Need detailed help? Use /help command.
             parts = data.split('_')
             if len(parts) < 3:
                 raise ValueError("Invalid sell data format")
-            
+
             percentage_str = parts[1]  # 25, 50, 100, custom
             token_id = '_'.join(parts[2:])  # Rejoin token ID parts
-            
+
             if percentage_str == "custom":
                 await query.edit_message_text(
                     f"💸 **Custom Sell Amount**\n\n"
@@ -1571,16 +1611,16 @@ Need detailed help? Use /help command.
                 )
                 await self.show_main_menu(query, user_id)
                 return
-            
+
             # Convert percentage
             try:
                 percentage = int(percentage_str)
             except ValueError:
                 raise ValueError("Invalid percentage")
-            
+
             # Create confirmation popup
             from ui.main_menu import MainMenu
-            
+
             confirmation_details = {
                 'token_symbol': f"Token {token_id[-6:]}",
                 'token_id': token_id,
@@ -1588,23 +1628,23 @@ Need detailed help? Use /help command.
                 'estimated_value': 1000.0,  # Would calculate real value
                 'token_amount': 1000.0  # Would calculate real amount
             }
-            
+
             message, keyboard = MainMenu.create_confirmation_popup("sell", confirmation_details)
             await query.edit_text(message, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"Handle sell percentage error: {e}")
             await query.edit_message_text("❌ Error processing sell request")
             await self.show_main_menu(query, user_id)
-    
+
     # === BUY AMOUNT HANDLERS ===
-    
+
     async def _handle_set_buy_amount(self, query, data: str, user_id: str):
         """Handle buy amount setting"""
         try:
             # Parse amount: set_buy_amount_50 or set_buy_amount_custom
             amount_str = data.replace('set_buy_amount_', '')
-            
+
             if amount_str == "custom":
                 await query.edit_message_text(
                     "💵 **Custom Buy Amount**\n\n"
@@ -1615,16 +1655,16 @@ Need detailed help? Use /help command.
                 )
                 await self.show_main_menu(query, user_id)
                 return
-            
+
             try:
                 amount = float(amount_str)
             except ValueError:
                 raise ValueError("Invalid amount")
-            
+
             # Update trading engine config
             from core.trading_engine import trading_engine
             result = await trading_engine.update_config(user_id, {'max_auto_buy_usd': amount})
-            
+
             if result['success']:
                 await query.edit_message_text(
                     f"✅ **Default Buy Amount Updated**\n\n"
@@ -1636,16 +1676,16 @@ Need detailed help? Use /help command.
                 )
             else:
                 await query.edit_message_text("❌ Failed to update buy amount")
-            
+
             await self.show_main_menu(query, user_id)
-            
+
         except Exception as e:
             logger.error(f"Set buy amount error: {e}")
             await query.edit_message_text("❌ Error setting buy amount")
             await self.show_main_menu(query, user_id)
-    
+
     # === EXECUTION HANDLERS ===
-    
+
     async def _handle_execute_action(self, query, data: str, user_id: str):
         """Handle execute action callbacks"""
         try:
@@ -1655,28 +1695,28 @@ Need detailed help? Use /help command.
                 if len(parts) >= 2:
                     token_id = parts[0]
                     percentage = parts[1]
-                    
+
                     await query.edit_message_text(
                         f"⏳ **Executing Sell Order...**\n\n"
                         f"Selling {percentage}% of token `{token_id}...`\n\n"
                         f"*This would execute the actual trade*\n\n"
                         f"✅ **Trade executed successfully!**"
                     )
-                    
+
             elif data.startswith('execute_buy_'):
                 # execute_buy_0x742d35Cc__50
                 parts = data.replace('execute_buy_', '').split('__')
                 if len(parts) >= 2:
                     token_id = parts[0]
                     amount = parts[1]
-                    
+
                     await query.edit_message_text(
                         f"⏳ **Executing Buy Order...**\n\n"
                         f"Buying ${amount} of token `{token_id}...`\n\n"
                         f"*This would execute the actual trade*\n\n"
                         f"✅ **Trade executed successfully!**"
                     )
-                    
+
             elif data == 'execute_panic_sell':
                 await query.edit_message_text(
                     f"🚨 **EXECUTING PANIC SELL...**\n\n"
@@ -1684,22 +1724,22 @@ Need detailed help? Use /help command.
                     f"*This would execute actual trades*\n\n"
                     f"✅ **All positions liquidated!**"
                 )
-            
+
             # Show main menu after execution
             await self.show_main_menu(query, user_id)
-            
+
         except Exception as e:
             logger.error(f"Execute action error: {e}")
             await query.edit_message_text("❌ Error executing action")
             await self.show_main_menu(query, user_id)
-    
+
     async def _handle_cancel_trade(self, query, user_id: str):
         """Handle trade cancellation"""
         await query.edit_message_text("✅ **Trade Cancelled**\n\nNo action was taken.")
         await self.show_main_menu(query, user_id)
-    
+
     # === SETTINGS HANDLERS ===
-    
+
     async def _handle_settings_callback(self, query, data: str, user_id: str):
         """Handle settings-related callbacks"""
         try:
@@ -1707,20 +1747,20 @@ Need detailed help? Use /help command.
                 from ui.main_menu import MainMenu
                 menu_text, menu_keyboard = MainMenu.get_buy_amount_menu()
                 await query.edit_text(menu_text, reply_markup=menu_keyboard, parse_mode='Markdown')
-            
+
             elif data == "settings_mirror_sell":
                 await self._handle_toggle_mirror_sell(query, user_id)
-            
+
             elif data == "settings_mirror_buy":
                 await self._handle_toggle_mirror_buy(query, user_id)
-            
+
             elif data == "settings_safe_mode":
                 await self._handle_toggle_safe_mode(query, user_id)
-            
+
             else:
                 await query.edit_message_text(f"⚙️ Settings feature '{data}' coming soon!")
                 await self.show_main_menu(query, user_id)
-                
+
         except Exception as e:
             logger.error(f"Settings callback error: {e}")
             await query.edit_message_text("❌ Error processing settings")
@@ -1838,27 +1878,27 @@ Need detailed help? Use /help command.
                 if not user:
                     await update.message.reply_text("❌ User not found. Please use /start first.")
                     return
-                
+
                 blacklist_entries = db.query(BlacklistEntry).filter(
                     BlacklistEntry.user_id == user.id,
                     BlacklistEntry.is_active == True
                 ).all()
-                
+
                 if not blacklist_entries:
                     message = "🚫 **Your Blacklist is Empty**\n\nNo wallets or tokens are currently blacklisted.\n\nUse `/blacklist add wallet 0x123...` to add entries."
                 else:
                     message = "🚫 **Your Blacklist**\n\n"
-                    
+
                     from utils.formatting import AddressFormatter
-                    
+
                     wallets = [e for e in blacklist_entries if e.entry_type == 'wallet']
                     tokens = [e for e in blacklist_entries if e.entry_type == 'token']
-                    
+
                     if wallets:
                         message += "**👤 Blacklisted Wallets:**\n"
                         for entry in wallets[:10]:  # Show max 10
                             wallet_link = AddressFormatter.format_wallet_address(
-                                entry.address, 
+                                entry.address,
                                 'ethereum',  # Default chain for display
                                 None
                             )
@@ -1867,7 +1907,7 @@ Need detailed help? Use /help command.
                         if len(wallets) > 10:
                             message += f"... and {len(wallets) - 10} more\n"
                         message += "\n"
-                    
+
                     if tokens:
                         message += "**🪙 Blacklisted Tokens:**\n"
                         for entry in tokens[:10]:  # Show max 10
@@ -1880,21 +1920,21 @@ Need detailed help? Use /help command.
                             message += f"• {token_link} - {reason}\n"
                         if len(tokens) > 10:
                             message += f"... and {len(tokens) - 10} more\n"
-                    
+
                     message += f"\n**Total Entries:** {len(blacklist_entries)}"
-                
+
                 keyboard = [
                     [InlineKeyboardButton("➕ Add Entry", callback_data="add_blacklist")],
                     [InlineKeyboardButton("➖ Remove Entry", callback_data="remove_blacklist")],
                     [InlineKeyboardButton("🔄 Refresh", callback_data="refresh_blacklist")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
+
                 await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Show blacklist error: {e}")
             await update.message.reply_text(f"❌ **Blacklist Error**\n\nFailed to load blacklist: {str(e)}")
@@ -1907,13 +1947,13 @@ Need detailed help? Use /help command.
                 user = db.query(User).filter(User.telegram_id == user_id).first()
                 if not user:
                     return False
-                
+
                 # Check if already exists
                 existing = db.query(BlacklistEntry).filter(
                     BlacklistEntry.user_id == user.id,
                     BlacklistEntry.address == address.lower()
                 ).first()
-                
+
                 if existing:
                     existing.is_active = True
                     existing.reason = reason
@@ -1926,13 +1966,13 @@ Need detailed help? Use /help command.
                         reason=reason
                     )
                     db.add(blacklist_entry)
-                
+
                 db.commit()
                 return True
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Add to blacklist error: {e}")
             return False
@@ -1945,22 +1985,22 @@ Need detailed help? Use /help command.
                 user = db.query(User).filter(User.telegram_id == user_id).first()
                 if not user:
                     return False
-                
+
                 blacklist_entry = db.query(BlacklistEntry).filter(
                     BlacklistEntry.user_id == user.id,
                     BlacklistEntry.address == address.lower()
                 ).first()
-                
+
                 if blacklist_entry:
                     blacklist_entry.is_active = False
                     db.commit()
                     return True
-                
+
                 return False
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Remove from blacklist error: {e}")
             return False
@@ -1974,42 +2014,42 @@ Need detailed help? Use /help command.
                 if not user:
                     await update.message.reply_text("❌ User not found. Please use /start first.")
                     return
-                
+
                 watched_wallets = db.query(WalletWatch).filter(
                     WalletWatch.user_id == user.id,
                     WalletWatch.is_active == True
                 ).all()
-                
+
                 if not watched_wallets:
                     message = "👁️ **Your Watchlist is Empty**\n\nNo wallets are currently being monitored.\n\nUse `/watchlist add 0x123... ethereum` to start watching wallets."
                 else:
                     message = f"👁️ **Your Watchlist** ({len(watched_wallets)} wallets)\n\n"
-                    
+
                     from utils.formatting import AddressFormatter
-                    
+
                     for i, wallet in enumerate(watched_wallets[:15], 1):  # Show max 15
                         chains = wallet.chains.split(',') if wallet.chains else ['ethereum']
                         main_chain = chains[0]
-                        
+
                         # Enhanced wallet link
                         wallet_link = AddressFormatter.format_wallet_address(
-                            wallet.wallet_address, 
-                            main_chain, 
+                            wallet.wallet_address,
+                            main_chain,
                             wallet.wallet_name or f"Wallet {i}"
                         )
-                        
+
                         chains_display = ', '.join([AddressFormatter.CHAIN_NAMES.get(c.lower(), c.upper()) for c in chains[:2]])
-                        
+
                         # Performance info if available
                         perf_info = ""
                         if wallet.win_rate:
                             perf_info = f" | {wallet.win_rate:.1f}% WR"
                         if wallet.best_multiplier and wallet.best_multiplier > 1:
                             perf_info += f" | {wallet.best_multiplier:.1f}x best"
-                        
+
                         message += f"{i}. {wallet_link}\n"
                         message += f"   Chains: {chains_display}{perf_info}\n"
-                        
+
                         if wallet.last_active:
                             days_ago = (datetime.utcnow() - wallet.last_active).days
                             if days_ago == 0:
@@ -2020,24 +2060,24 @@ Need detailed help? Use /help command.
                                 message += f"   🔴 Active {days_ago}d ago\n\n"
                         else:
                             message += f"   ⚪ Not tracked yet\n\n"
-                    
+
                     if len(watched_wallets) > 15:
                         message += f"... and {len(watched_wallets) - 15} more wallets\n\n"
-                    
+
                     message += "🔄 Scanning every 30 seconds for new activity"
-                
+
                 keyboard = [
                     [InlineKeyboardButton("➕ Add Wallet", callback_data="add_watchlist")],
                     [InlineKeyboardButton("➖ Remove Wallet", callback_data="remove_watchlist")],
                     [InlineKeyboardButton("🔍 Scan Now", callback_data="manual_scan")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
+
                 await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Show watchlist error: {e}")
             await update.message.reply_text(f"❌ **Watchlist Error**\n\nFailed to load watchlist: {str(e)}")
@@ -2050,22 +2090,22 @@ Need detailed help? Use /help command.
                 user = db.query(User).filter(User.telegram_id == user_id).first()
                 if not user:
                     return False
-                
+
                 wallet_watch = db.query(WalletWatch).filter(
                     WalletWatch.user_id == user.id,
                     WalletWatch.wallet_address == wallet_address.lower()
                 ).first()
-                
+
                 if wallet_watch:
                     wallet_watch.is_active = False
                     db.commit()
                     return True
-                
+
                 return False
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Remove from watchlist error: {e}")
             return False
@@ -2076,13 +2116,13 @@ Need detailed help? Use /help command.
             # Ethereum/BSC address validation
             if address.startswith('0x') and len(address) == 42:
                 return True
-            
+
             # Solana address validation (basic)
             if len(address) >= 32 and len(address) <= 44 and not address.startswith('0x'):
                 return True
-            
+
             return False
-            
+
         except Exception:
             return False
 
@@ -2101,43 +2141,46 @@ async def send_message_to_user(telegram_id: str, message: str, reply_markup=None
 def main():
     """Start the enhanced bot"""
     print('🤖 Meme Trader V4 Pro Enhanced Bot starting...')
-    
+
     # Run startup sequence
     from startup import run_startup
     startup_success = run_startup()
-    
+
     if not startup_success:
         print('❌ Failed to initialize integrations. Exiting...')
         return
-    
+
     # Create database tables
     create_tables()
-    
+
     # Start background services
     print('🔍 Starting background services...')
-    
+
     # Create application and bot instance
     application = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
     bot = MemeTraderBot()
-    
+
     # Add command handlers
     application.add_handler(CommandHandler("start", bot.start_command))
     application.add_handler(CommandHandler("help", bot.help_command))
+    application.add_handler(CommandHandler("analyze", bot.analyze_command))
+    application.add_handler(CommandHandler("watchlist", bot.watchlist_command))
+    application.add_handler(CommandHandler("balances", bot.balances_command))
+    application.add_handler(CommandHandler("mybalances", bot.balances_command))
+    application.add_handler(CommandHandler("generate_exec_wallet", bot.generate_exec_wallet_command))
+    application.add_handler(CommandHandler("deposit_address", bot.deposit_address_command))
     application.add_handler(CommandHandler("buy", bot.buy_command))
     application.add_handler(CommandHandler("sell", bot.sell_command))
-    application.add_handler(CommandHandler("analyze", bot.analyze_command))
-    application.add_handler(CommandHandler("panic_sell", bot.panic_sell_command))
-    application.add_handler(CommandHandler("scan", bot.scan_command))
-    application.add_handler(CommandHandler("leaderboard", bot.leaderboard_command))
-    application.add_handler(CommandHandler("alerts", bot.alerts_command))
-    application.add_handler(CommandHandler("blacklist", bot.blacklist_command))
-    application.add_handler(CommandHandler("watchlist", bot.watchlist_command))
-    application.add_handler(CommandHandler("settings", bot.settings_command))
     application.add_handler(CommandHandler("portfolio", bot.portfolio_command))
-    
-    # Add basic callback handler for inline keyboards
+    application.add_handler(CommandHandler("alerts", bot.alerts_command))
+    application.add_handler(CommandHandler("scan", bot.scan_command))
+    application.add_handler(CommandHandler("stats", bot.stats_command))
+
+    # Add callback query handler
     application.add_handler(CallbackQueryHandler(bot.unified_callback_handler))
-    
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.message_handler))
+
+
     # Start the bot
     print('✅ Enhanced Bot is ready and listening for messages!')
     print('🔥 New features: /scan, /leaderboard, /alerts, /watchlist, /blacklist commands')
@@ -2145,14 +2188,14 @@ def main():
     print('🛡️  Enhanced security: Honeypot simulation, gas optimization, risk assessment')
     print('📡 Real-time monitoring: Mempool tracking, price alerts, portfolio analytics')
     print('🚀 Multi-chain: Ethereum, BSC, and Solana trading with mirror functionality')
-    
+
     # Fix asyncio event loop issue
     try:
         import nest_asyncio
         nest_asyncio.apply()
     except ImportError:
         pass
-    
+
     # Start polling with proper error handling
     try:
         # Start background services after bot initialization
@@ -2163,13 +2206,13 @@ def main():
                 await wallet_scanner.start_scanning()
             except Exception as e:
                 logger.error(f"Failed to start background services: {e}")
-        
+
         # Schedule background services to start
         import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.create_task(start_background_services())
-        
+
         application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
     except KeyboardInterrupt:
         print('\n⏹️ Bot stopped by user')
