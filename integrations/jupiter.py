@@ -300,3 +300,189 @@ class JupiterClient(BaseAPIClient):
         except Exception as e:
             logger.error(f"Failed to get price history: {e}")
             return []
+"""
+Jupiter API Integration for Solana Trading and Route Optimization
+"""
+
+import logging
+import aiohttp
+import asyncio
+from typing import Dict, List, Optional, Any
+from decimal import Decimal
+from .base import BaseAPIClient
+from utils.key_manager import key_manager
+
+logger = logging.getLogger(__name__)
+
+
+class JupiterClient(BaseAPIClient):
+    """Jupiter API client for Solana trading"""
+    
+    def __init__(self):
+        super().__init__(None, "https://quote-api.jup.ag/v6", rate_limit=100)
+        self.price_api_url = "https://api.jup.ag/price/v2"
+        
+    async def health_check(self) -> bool:
+        """Check if Jupiter API is accessible"""
+        try:
+            result = await self.make_request('GET', '/tokens')
+            return result is not None and len(result) > 0
+        except Exception as e:
+            logger.error(f"Jupiter health check failed: {e}")
+            return False
+    
+    async def get_quote(self, input_mint: str, output_mint: str, amount: int, 
+                       slippage_bps: int = 100) -> Optional[Dict]:
+        """Get swap quote from Jupiter"""
+        try:
+            params = {
+                'inputMint': input_mint,
+                'outputMint': output_mint,
+                'amount': amount,
+                'slippageBps': slippage_bps,
+                'onlyDirectRoutes': 'false',
+                'asLegacyTransaction': 'false'
+            }
+            
+            result = await self.make_request('GET', '/quote', params=params)
+            
+            if result:
+                logger.info(f"Jupiter quote: {amount} -> {result.get('outAmount', 0)}")
+                return result
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get Jupiter quote: {e}")
+            return None
+    
+    async def get_swap_transaction(self, quote: Dict, wallet_address: str, 
+                                 priority_fee: int = 0) -> Optional[Dict]:
+        """Get swap transaction from Jupiter"""
+        try:
+            payload = {
+                'quoteResponse': quote,
+                'userPublicKey': wallet_address,
+                'wrapAndUnwrapSol': True,
+                'prioritizationFeeLamports': priority_fee,
+                'asLegacyTransaction': False,
+                'dynamicComputeUnitLimit': True,
+                'skipUserAccountsRpcCalls': True
+            }
+            
+            result = await self.make_request('POST', '/swap', data=payload)
+            
+            if result and 'swapTransaction' in result:
+                return result
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get swap transaction: {e}")
+            return None
+    
+    async def get_token_price(self, mint_address: str) -> Optional[float]:
+        """Get token price from Jupiter"""
+        try:
+            session = await self.get_session()
+            url = f"{self.price_api_url}"
+            params = {'ids': mint_address}
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    price_data = data.get('data', {}).get(mint_address)
+                    if price_data:
+                        return float(price_data.get('price', 0))
+                
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to get token price: {e}")
+            return None
+    
+    async def get_token_list(self) -> List[Dict]:
+        """Get Jupiter token list"""
+        try:
+            result = await self.make_request('GET', '/tokens')
+            
+            if result and isinstance(result, list):
+                return result
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Failed to get token list: {e}")
+            return []
+    
+    async def simulate_swap(self, input_mint: str, output_mint: str, amount: int) -> Dict:
+        """Simulate swap to check for honeypots and slippage"""
+        try:
+            # Get quote with high slippage tolerance for simulation
+            quote = await self.get_quote(input_mint, output_mint, amount, slippage_bps=1000)
+            
+            if not quote:
+                return {
+                    'success': False,
+                    'error': 'Failed to get quote',
+                    'is_honeypot': True
+                }
+            
+            # Analyze quote for potential issues
+            input_amount = int(quote.get('inAmount', 0))
+            output_amount = int(quote.get('outAmount', 0))
+            
+            if input_amount == 0 or output_amount == 0:
+                return {
+                    'success': False,
+                    'error': 'Zero amounts detected',
+                    'is_honeypot': True
+                }
+            
+            # Check for excessive slippage
+            price_impact = float(quote.get('priceImpactPct', 0))
+            if price_impact > 50:  # 50% price impact indicates potential honeypot
+                return {
+                    'success': False,
+                    'error': f'Excessive price impact: {price_impact}%',
+                    'is_honeypot': True
+                }
+            
+            return {
+                'success': True,
+                'price_impact': price_impact,
+                'output_amount': output_amount,
+                'is_honeypot': False,
+                'route_plan': quote.get('routePlan', [])
+            }
+            
+        except Exception as e:
+            logger.error(f"Swap simulation failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'is_honeypot': True
+            }
+    
+    async def get_route_map(self, input_mint: str, output_mint: str) -> List[str]:
+        """Get available route map for token pair"""
+        try:
+            params = {
+                'inputMint': input_mint,
+                'outputMint': output_mint
+            }
+            
+            result = await self.make_request('GET', '/route-map', params=params)
+            
+            if result and 'routes' in result:
+                return result['routes']
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Failed to get route map: {e}")
+            return []
+
+
+# Global Jupiter client instance
+jupiter_client = JupiterClient()

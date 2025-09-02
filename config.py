@@ -13,28 +13,32 @@ class Config:
     GOPLUS_API_KEY = os.getenv('GOPLUS_API_KEY') 
     COINGECKO_API_KEY = os.getenv('COINGECKO_API_KEY')
     
-    # Ethereum Configuration
-    ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://eth-sepolia.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
-    CHAIN_ID = int(os.getenv('CHAIN_ID', '11155111'))  # Sepolia testnet
-    NETWORK_NAME = os.getenv('NETWORK_NAME', 'sepolia')
+    # Ethereum Mainnet Configuration
+    ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://eth-mainnet.g.alchemy.com/v2/')
+    CHAIN_ID = int(os.getenv('CHAIN_ID', '1'))  # Ethereum mainnet
+    NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
     
-    # BSC Configuration
-    BSC_RPC_URL = os.getenv('BSC_RPC_URL', 'https://bnb-testnet.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
-    BSC_CHAIN_ID = int(os.getenv('BSC_CHAIN_ID', '97'))  # BSC testnet
-    BSC_NETWORK_NAME = os.getenv('BSC_NETWORK_NAME', 'bsc-testnet')
+    # BSC Mainnet Configuration  
+    BSC_RPC_URL = os.getenv('BSC_RPC_URL', 'https://bnb-mainnet.g.alchemy.com/v2/')
+    BSC_CHAIN_ID = int(os.getenv('BSC_CHAIN_ID', '56'))  # BSC mainnet
+    BSC_NETWORK_NAME = os.getenv('BSC_NETWORK_NAME', 'bsc-mainnet')
     
-    # Alchemy WebSocket URLs
-    ALCHEMY_ETH_WS_URL = os.getenv('ALCHEMY_ETH_WS_URL', 'wss://eth-sepolia.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
-    ALCHEMY_BSC_WS_URL = os.getenv('ALCHEMY_BSC_WS_URL', 'wss://bnb-testnet.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
+    # Mainnet WebSocket URLs
+    ALCHEMY_ETH_WS_URL = os.getenv('ALCHEMY_ETH_WS_URL', 'wss://eth-mainnet.g.alchemy.com/v2/')
+    ALCHEMY_BSC_WS_URL = os.getenv('ALCHEMY_BSC_WS_URL', 'wss://bnb-mainnet.g.alchemy.com/v2/')
     
-    # 0x Protocol APIs
-    ZEROEX_ETH_API = os.getenv('ZEROEX_ETH_API', 'https://sepolia.api.0x.org')
+    # Solana Mainnet Configuration
+    SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+    SOLANA_NETWORK = os.getenv('SOLANA_NETWORK', 'mainnet-beta')
+    HELIUS_API_URL = os.getenv('HELIUS_API_URL', 'https://api.helius.xyz/v0')
+    
+    # 0x Protocol APIs - Mainnet
+    ZEROEX_ETH_API = os.getenv('ZEROEX_ETH_API', 'https://api.0x.org')
     ZEROEX_BSC_API = os.getenv('ZEROEX_BSC_API', 'https://bsc.api.0x.org')
     
-    # Jupiter/Solana Configuration
+    # Jupiter/Solana Configuration - Mainnet
     JUPITER_API_URL = os.getenv('JUPITER_API_URL', 'https://quote-api.jup.ag/v6')
-    SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-devnet.g.alchemy.com/v2/Iurh2GQfC9EzY-mtDP3dI')
-    SOLANA_NETWORK = os.getenv('SOLANA_NETWORK', 'devnet')
+    JUPITER_PRICE_API = os.getenv('JUPITER_PRICE_API', 'https://api.jup.ag/price/v2')
     
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///meme_trader.db')
@@ -64,32 +68,30 @@ class Config:
     PANCAKESWAP_ROUTER = '0xD99D1c33F9fC3444f8101754aBC46c52416550D1'  # BSC testnet
     SUSHISWAP_ROUTER = '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F'
     
-    # Common token addresses
-    WETH_ADDRESS = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-    WETH_SEPOLIA = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9'
-    WBNB_ADDRESS = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'
-    WBNB_TESTNET = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'
+    # Mainnet token addresses
+    WETH_ADDRESS = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'  # Ethereum mainnet
+    WBNB_ADDRESS = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'  # BSC mainnet
+    WSOL_ADDRESS = 'So11111111111111111111111111111111111111112'  # Solana wrapped SOL
+    USDC_ADDRESS = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana USDC
     
     @classmethod
     def get_wrapped_native_token(cls, chain_id: int) -> str:
         """Get wrapped native token address for chain"""
         if chain_id == 1:  # Ethereum mainnet
             return cls.WETH_ADDRESS
-        elif chain_id == 11155111:  # Sepolia
-            return cls.WETH_SEPOLIA
         elif chain_id == 56:  # BSC mainnet
             return cls.WBNB_ADDRESS
-        elif chain_id == 97:  # BSC testnet
-            return cls.WBNB_TESTNET
+        elif chain_id == 101:  # Solana mainnet
+            return cls.WSOL_ADDRESS
         else:
-            return cls.WETH_SEPOLIA  # Default to Sepolia WETH
+            return cls.WETH_ADDRESS  # Default to Ethereum WETH
     
     @classmethod
     def get_router_address(cls, chain_id: int) -> str:
         """Get router address for chain"""
-        if chain_id in [1, 11155111]:  # Ethereum/Sepolia
+        if chain_id == 1:  # Ethereum mainnet
             return cls.UNISWAP_V2_ROUTER
-        elif chain_id in [56, 97]:  # BSC
+        elif chain_id == 56:  # BSC mainnet
             return cls.PANCAKESWAP_ROUTER
         else:
             return cls.UNISWAP_V2_ROUTER
@@ -97,9 +99,9 @@ class Config:
     @classmethod
     def get_0x_api_url(cls, chain_id: int) -> str:
         """Get 0x API URL for chain"""
-        if chain_id in [1, 11155111]:  # Ethereum/Sepolia
+        if chain_id == 1:  # Ethereum mainnet
             return cls.ZEROEX_ETH_API
-        elif chain_id in [56, 97]:  # BSC
+        elif chain_id == 56:  # BSC mainnet
             return cls.ZEROEX_BSC_API
         else:
             return cls.ZEROEX_ETH_API

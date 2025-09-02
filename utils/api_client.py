@@ -53,7 +53,6 @@ class CovalentAPI:
     """Covalent API client for blockchain data"""
 
     def __init__(self):
-        self.api_key = Config.COVALENT_API_KEY
         self.base_url = "https://api.covalenthq.com/v1"
         self.chain_id = Config.CHAIN_ID
         self.session = None
@@ -62,11 +61,17 @@ class CovalentAPI:
         self.max_requests_per_minute = 100
 
     async def get_session(self):
-        """Get or create aiohttp session"""
+        """Get or create aiohttp session with rotated API key"""
+        from utils.key_manager import key_manager
+        
         if self.session is None or self.session.closed:
+            api_key = await key_manager.get_key('covalent')
+            if not api_key:
+                raise Exception("No Covalent API keys available")
+                
             self.session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=Config.REQUEST_TIMEOUT),
-                headers={'Authorization': f'Bearer {self.api_key}'}
+                headers={'Authorization': f'Bearer {api_key}'}
             )
         return self.session
 
@@ -89,9 +94,20 @@ class CovalentAPI:
                     data = await response.json()
                     return data.get('data')
                 elif response.status == 429:
-                    logger.warning("Rate limit exceeded, waiting...")
-                    await asyncio.sleep(60)
+                    logger.warning("Rate limit exceeded, rotating API key...")
+                    # Close current session to force key rotation
+                    await self.close_session()
+                    await asyncio.sleep(2)
                     return await self.make_request(endpoint, params)
+                elif response.status in [401, 403]:
+                    logger.error(f"API authentication failed: {response.status}")
+                    # Record error for current key
+                    from utils.key_manager import key_manager
+                    current_key = self.session.headers.get('Authorization', '').split(' ')[-1]
+                    await key_manager.record_api_error('covalent', current_key)
+                    # Close session to force key rotation
+                    await self.close_session()
+                    return None
                 else:
                     logger.error(f"API request failed: {response.status}")
                     return None

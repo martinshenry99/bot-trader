@@ -13,3 +13,8 @@ requests
 websockets
 psycopg2-binary
 telegram
+base58
+solana
+base58
+binpan
+solana

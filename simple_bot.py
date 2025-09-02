@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = "8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY"
 
+# Import new services and handlers
+from services.wallet_scanner import wallet_scanner
+from services.wallet_analyzer import wallet_analyzer
+from services.mirror_trading import mirror_trading_service
+from handlers.key_management import handle_keys_command, handle_rotation_stats_command, handle_keys_callback
+from utils.key_manager import key_manager
+from handlers.mirror_trading import handle_mirror_start, handle_mirror_stop, handle_auto_sell_toggle
+from utils.formatting import format_wallet_analysis, format_portfolio
+
+
 class MemeTraderBot:
     def __init__(self):
         self.user_sessions = {}
@@ -193,6 +203,8 @@ Welcome {username}! 👋
                 await self.handle_scan_action(query, data, user_id)
             elif data == "cancel_trade":
                 await self.handle_cancel_trade(query, user_id)
+            elif data.startswith("keys_"):
+                await handle_keys_callback(query, data, user_id)
             else:
                 await query.edit_message_text("🤖 Action not implemented yet. Please use the main menu.")
                 await self.show_main_menu_callback(query, user_id)
@@ -637,6 +649,16 @@ Welcome {username}! 👋
 • `/settings` - Configure trading
 • `/watchlist` - Manage watched wallets
 • `/blacklist` - Manage blocked addresses
+
+**🔑 Key Management:**
+• `/keys` - Manage API keys (Covalent, Ethereum, BSC)
+• `/rotation_stats` - View API key rotation statistics
+
+**🪞 Mirror Trading:**
+• `/mirror_start` - Start mirror trading
+• `/mirror_stop` - Stop mirror trading
+• `/mirror_settings` - Configure mirror trading
+• `/auto_sell [on/off]` - Toggle auto-sell
 
 **🛡️ Safety Features:**
 • Safe Mode blocks risky trades
@@ -1212,6 +1234,21 @@ def main():
     application.add_handler(CommandHandler("buy", bot.buy_command))
     application.add_handler(CommandHandler("sell", bot.sell_command))
     application.add_handler(CommandHandler("analyze", bot.analyze_command))
+
+    # Performance command
+    application.add_handler(CommandHandler("performance", bot.performance_command))
+
+    # Logs command
+    application.add_handler(CommandHandler("logs", bot.logs_command))
+
+    # Key management commands
+    application.add_handler(CommandHandler("keys", handle_keys_command))
+    application.add_handler(CommandHandler("rotation_stats", handle_rotation_stats_command))
+
+    # Mirror trading commands
+    application.add_handler(CommandHandler("mirror_start", handle_mirror_start))
+    application.add_handler(CommandHandler("mirror_stop", handle_mirror_stop))
+    application.add_handler(CommandHandler("auto_sell", handle_auto_sell_toggle))
 
     # Add callback handler
     application.add_handler(CallbackQueryHandler(bot.callback_handler))
