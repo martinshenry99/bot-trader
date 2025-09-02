@@ -1018,14 +1018,10 @@ This amount will be used for:
         except Exception as e:
             logger.error(f"Top traders scan error: {e}")
             await query.edit_message_text(
-                f"❌ **Scan Failed**\n\n"
+                "❌ **Scan Failed**\n\n"
                 f"Error: {str(e)}\n\n"
-                f"🔄 The scanning system encountered an issue.\n"
-                f"This could be due to:\n"
-                f"• Network connectivity\n"
-                f"• API rate limits\n"
-                f"• Data processing load\n\n"
-                f"Please try again in a few minutes."
+                "Please try again or contact support if the issue persists.",
+                parse_mode='Markdown'
             )
             await asyncio.sleep(3)
             await self.show_main_menu_callback(query, user_id)
