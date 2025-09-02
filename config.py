@@ -5,7 +5,7 @@ load_dotenv()
 
 class Config:
     # Telegram
-    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY')
     
     # API Keys
     COVALENT_API_KEY = os.getenv('COVALENT_API_KEY')
