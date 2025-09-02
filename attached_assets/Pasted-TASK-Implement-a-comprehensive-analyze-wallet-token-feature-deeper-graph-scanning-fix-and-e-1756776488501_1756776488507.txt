@@ -1,0 +1,135 @@
+TASK: Implement a comprehensive `/analyze` wallet/token feature + deeper "graph" scanning, fix and extend watchlist features, add a secure exec-wallet creation flow (12-word mnemonic), and add a balances/deposit command. Do not leak secrets. Follow these requirements exactly.
+
+GENERAL RULES (must follow)
+1. Never commit or print real secrets (mnemonic/private keys/API keys) into the repository or Telegram chat. Use .env for API keys and .gitignore keystores.
+2. When a mnemonic is generated, write it to a local encrypted keystore file only (Web3 standard keystore JSON encrypted via a passphrase). Optionally print the mnemonic once to the server console (not Telegram), with a big warning to the operator to save it permanently; do not store plaintext anywhere else.
+3. Require ADMIN_TELEGRAM_ID for any command that reveals the bot’s own deposit addresses or manages keystores.
+4. All external API calls must use rotating keys and backoff (Covalent, Etherscan/GoPlus, CoinGecko, Bitquery optional).
+5. Rate-limit the `/analyze` endpoint per-user and cache results for a configurable TTL (default 10 minutes) to avoid burning API quotas.
+
+NEW / FIXED COMMANDS (exact)
+1. `/analyze <address_or_contract>`  — Public command.
+   - If input is a wallet address (EOA):
+     - Run `analyze_wallet(address, chain, depth=3)` (depth default=3; configurable by admin).
+     - Output summary:
+       * Wallet label (if in DB) and short clickable link to block explorer.
+       * Score (0-100) and classification: Safe / Watch / Risky.
+       * Max multiplier (historical), win rate (% of profitable trades), average hold time, #tokens traded, last activity timestamp.
+       * Top 5 profitable tokens (token symbol, buy_tx, sell_tx, profit %, USD gain).
+       * Top 10 counterparties (addresses that funded or received most value) with links and a “Follow” button for each.
+       * Graph metrics: cluster size, number of funding sources, likely dev/founder involvement boolean.
+       * Quick actions inline: [Follow Wallet] [Add to Watchlist] [Analyze Token(s) involved] [Copy Address]
+     - Acceptance: sample `/analyze 0xabc...` returns a human-readable summary with the fields above and inline buttons.
+
+   - If input is a token contract:
+     - Run `analyze_token(contract, chain)`:
+       * Token age (deploy time), total supply, decimals, verified source code flag, owner address(s).
+       * Liquidity pair health: LP token reserves, USD liquidity, top LP provider address, % of LP owned by deployer.
+       * Holder distribution (top 10 holders %), rug risk metrics (owner has >X%? fast transfers of LP?), and lock status (locked/unlocked + expiry).
+       * Honeypot simulation: run safe `eth_call` simulated sell (small amount) via likely router(s); report pass/fail and error messages if revert.
+       * Ownership functions: presence of `renounceOwnership()`, `onlyOwner` usage in source.
+       * Combined risk_flags: HONEYPOT, LIQUIDITY_RISK, DEV_CONTROL, LOW_LIQUIDITY, VERIFIED_CODE.
+       * Inline actions: [Add to Blacklist] [Add to Watchlist] [Copy Contract] [View on Explorer].
+     - Acceptance: `/analyze 0xToken...` produces the above token analysis and signals HONEYPOT true/false.
+
+2. Fix `/watchlist` to support add/remove/list/label:
+   - Commands:
+     - `/watchlist add <address_or_contract> [label]` (store chain auto-detected or provided)
+     - `/watchlist remove <address_or_contract>`
+     - `/watchlist list` → returns paginated list of watchlist items, each with inline buttons [Analyze] [Remove] [Rename]
+     - `/watchlist rename <address> <new_label>`
+   - Persist in DB table `watchlist(address PK, label, chain, added_by, ts, active BOOLEAN)`.
+   - The Scanner must subscribe to watchlist changes at runtime (hot-reload).
+
+3. `/balances` (or `/mybalances`) — Authenticated for the user:
+   - Shows all executor wallet public addresses the user has configured/linked with the bot (address only — do not show private keys or seed).
+   - For each address and chain list:
+     * Native balance (ETH/BNB/SOL) and USD value.
+     * Token balances (top N tokens by USD value) with contract link and USD conversion.
+     * Inline actions per address: [Show Deposit Address] [View on Explorer] [Refresh]
+   - ADMIN only addition: `/deposit_address <wallet_id>` shows deposit instructions (chain, address, small note) for that wallet. This command must verify ADMIN_TELEGRAM_ID.
+
+4. `/generate_exec_wallet` — ADMIN only:
+   - Generate a **12-word mnemonic** locally using a standard BIP39 library.
+   - Immediately create:
+     * Encrypted EVM keystore (eth_account.Account.encrypt(mnemonic-derived-private-key, password)) and store in `keystores/` with randomized filename.
+     * Derived public address and store that public address in DB `executors(id, address, keystore_path, chain, created_at)`.
+   - **Do not** send the mnemonic over Telegram. Instead:
+     - Option A (recommended): print the mnemonic **only to the server console/stdout** and exit, with a big warning to copy & store the phrase immediately. Also create a one-line file `keystores/last_mnemonic_shown.txt` that contains a SHA256 of the mnemonic for operator verification and then delete the plaintext file after operator acknowledges.
+     - Option B (if operator explicitly requests), send the mnemonic in Telegram only to ADMIN (must be explicitly permitted and warned) — *but prefer Option A*. Implement explicit `--force-show` flag and require an extra passphrase confirmation.
+   - Acceptance: after calling `/generate_exec_wallet`, the DB contains the new public address, `keystores/` contains an encrypted keystore JSON, and the server logs display an instruction for the operator to back up the mnemonic.
+
+DEEP SCANNING (graph analysis)
+- Implement `analyze_wallet(address, chain, depth=3, breadth_limit=200)`:
+  1. Use Covalent (or Bitquery if available) to fetch transfer history for `depth` hops:
+     - Hop 0 = the wallet
+     - Hop 1 = direct counterparties (addresses interacting with wallet or contracts)
+     - Hop 2+ = counterparties of counterparties
+  2. Build a directed interaction graph; compute:
+     - Degree centrality, cluster id (connected component), number of funding sources, typical funding chain length.
+     - Detect clusters of addresses that are funded by the same origin (shared input funding addresses).
+  3. For each node (address) include flags:
+     - Known CEX hot wallet (by heuristics / list)
+     - Known dev/owner behavior (adds liquidity then transfers)
+     - Reused deployer address or contract creation activity
+  4. Limit the total visited nodes to `breadth_limit` (default 200) and return a summarized graph (top 20 nodes with reasons).
+- Add a `depth` parameter to `/analyze`, e.g. `/analyze 0xabc.. 4` to deep-scan 4 hops.
+
+RISK METRICS & HOW TO COMPUTE (exact)
+- Win rate = (# profitable token trades by that wallet in history window) / (total trades with buy+sell pair). Use Covalent quote_rate for USD per transfer when available.
+- Max multiplier = max(sell_usd / buy_usd) across completed pairs.
+- Liquidity health:
+  - Query pair reserves; compute USD value of reserves; threshold < $5k => LOW_LIQUIDITY.
+  - If owner owns >25% of LP tokens and liquidity not locked => HIGH_RISK.
+- Honeypot detection: run `eth_call` sell simulation; detect revert strings or failure patterns; complement with GoPlus/Tokensniffer API scores if available.
+- Approval checks: list ERC20 approvals by the wallet (large approvals to router or spender = risk).
+
+UI / Inline buttons / Ease of use
+- All addresses and contracts in messages must be:
+  - short displayed (0xABCD...1234) but clickable to block explorer link (Etherscan/BscScan/Solscan).
+  - have inline buttons for [Analyze Wallet], [Analyze Token], [Copy Address], [Add to Watchlist].
+- After a scan alert the bot must include an inline button: **“Analyze Wallet”** which triggers `/analyze <address>` automatically so user doesn't have to type it.
+
+WATCHLIST / SCANNER FIXES
+- Ensure the watchlist command properly registers wallets/tokens to DB and Scanner processes events for them.
+- Scanner must:
+  - Poll Covalent `transfers_v2` for each watchlist item on a configurable interval (default 60s).
+  - Subscribe to mempool watch for large pending buys (via Alchemy WS) for addresses in watchlist and for the top N discovered wallets.
+  - When a new token buy is found, the Scanner should create a watchlist entry automatically if `auto_follow` flagged in settings (configurable).
+- Add `watchlist.autofollow_min_usd` setting (default 1000 USD).
+
+BALANCES & DEPOSIT UX
+- `/balances` returns:
+  - For each linked executor wallet: public address + native balance + USD value + top tokens.
+  - A single inline button: [Show Deposit Address] — when clicked, shows the public address (and optional QR or explorer link). This action should be restricted by ADMIN_TELEGRAM_ID to avoid accidental exposure to public chats.
+- Ensure `/balances` shows the wallet address (public) so the user can deposit funds there.
+
+PERFORMANCE & CACHING
+- Cache heavy lookups (Covalent token holder queries) for TTL=600s default.
+- If `depth > 2` show a progress message in Telegram (e.g., “Deep scan in progress — this can take up to 60s. I will post results when ready.”).
+
+ERRORS, LOGS & ACCEPTANCE TESTS (exact)
+1. Unit tests:
+   - `tests/test_analyze_wallet.py::test_analyze_wallet_basic` → mock Covalent responses and assert output contains `win_rate`, `max_multiplier`, `top_tokens`.
+   - `tests/test_honeypot.py::test_honeypot_detect` → mock eth_call revert and assert HONEYPOT flagged.
+2. Manual acceptance:
+   - Add watchlist: `/watchlist add 0x1234... MyWhale` → `watchlist list` shows the entry with label and inline Analyze button.
+   - Scan: `/scan` triggers immediate run and returns any recent buys/sells for watchlist items (or "no events found" if none).
+   - Analyze token: `/analyze 0xTOKEN...` returns `honeypot` boolean and liquidity health.
+   - Create exec wallet (admin): call `/generate_exec_wallet` — after confirmation, server contains encrypted keystore and DB has public address; server console prints mnemonic once with a big warning. The bot NEVER sends the mnemonic to Telegram.
+   - Get balances: `/balances` shows addresses and USD values; `[Show Deposit Address]` reveals the public address for deposit (admin only).
+
+DOCUMENTATION & SECURITY NOTES TO ADD
+- Add README section: "How to securely generate and backup the mnemonic" with explicit operator steps.
+- Add runtime setting: `SHOW_MNEMONIC_IN_TELEGRAM=false` default. Only allow `true` with a second environment flag `ALLOW_INSECURE_MNEMONIC_TRANSMIT` and double-confirm prompt (but still disallowed by default).
+- Add pre-commit or CI check to fail the commit if any file contains a 12-word BIP39 pattern or if `keystores/*.json` is staged.
+
+IMPLEMENTATION POINTERS (files / skeleton)
+- `bot/commands.py` → add `analyze_cmd`, `watchlist_cmd`, `balances_cmd`, `generate_exec_wallet_cmd`.
+- `services/covalent_client.py` → add `get_transfers(address, chain, page_size)`, `get_token_holders(contract)`.
+- `security/honeypot.py` → implement `simulate_sell(token, router_list, chain)`.
+- `wallet/keystore.py` → implement `generate_mnemonic()`, `derive_private_key(mnemonic)`, `encrypt_keystore(private_key, passphrase)`.
+- `db/models.py` → add `executors` and update `watchlist` schema.
+
+FINAL: Error messages and user-friendly text - make them clear and actionable. Example outputs:
+- For a wallet analyze success:
