@@ -1,0 +1,60 @@
+You are upgrading the Meme Trader V4 Pro bot to include **API key rotation** and dual integration for **Solana scanning (Helius)** and **Solana trading (Jupiter)**.  
+
+### 🔹 API Key Rotation Logic
+1. Implement a **key manager module** (`keyManager.py`) that:
+   - Stores multiple API keys for **Covalent, Ethereum (Alchemy/Infura), BSC, Solana (Helius)**.  
+   - Tracks usage counts and rate limits for each key.  
+   - Automatically switches to the next available key when one approaches its daily/monthly limit.  
+   - If all keys for a service are exhausted, send a Telegram alert:  
+     > "⚠️ API limit reached for {service}, please add more keys."  
+
+2. The bot must **randomize key usage** slightly to avoid detection, but still cycle logically.  
+
+3. Allow the user to add or remove keys dynamically via a config file (`keys.json`).  
+
+---
+
+### 🔹 Solana Integration
+- **Helius API**  
+  - Used for wallet monitoring, scanning, and early mempool alerts.  
+  - When `/scan` or `/watchlist` is used, fetch wallet activity from Helius.  
+  - Detect large token buys/sells and forward them to Telegram in **USD value**.  
+  - Honeypot/ownership/liquidity checks run before forwarding signals.  
+
+- **Jupiter API**  
+  - Used for execution commands like `/buy`, `/sell`, `/panic_sell`, and **mirror trading**.  
+  - Bot should auto-route trades for best execution via Jupiter aggregator.  
+  - Add fallback to block pooling (if Jupiter is down, try Serum direct route).  
+
+---
+
+### 🔹 Extra Logic
+1. **Rotation should apply across chains**:  
+   - Covalent → wallet scans + balances.  
+   - Ethereum/Alchemy → tx lookups + mempool.  
+   - BSC → same as ETH but Pancake.  
+   - Solana → Helius (scanning) + Jupiter (execution).  
+
+2. **Wallet Scanning Logic** (for `/scan top traders`):  
+   - Use Covalent + Helius to gather wallets with high profitability signals.  
+   - Criteria:  
+     - Wallet has 200x+ profit in last 7–30 days.  
+     - Wallet active in mempool (not dormant).  
+     - Liquidity checks on their last 3 trades.  
+   - Exclude blacklisted/rug wallets.  
+   - Store results in DB with labels (e.g., "Whale_01", "AlphaTrader_02").  
+
+3. **Mirror-Sell (default ON)**  
+   - When any watched wallet sells, bot triggers auto-sell for same token unless Safe Mode is enabled.  
+
+4. **Safe Mode (toggle)**  
+   - Adds extra confirmation for trades.  
+   - Blocks auto-buys if honeypot sim or liquidity check fails.  
+
+5. **End-of-Day Report**  
+   - Summarize: total buys/sells, profit in USD, portfolio value, alerts triggered.  
+
+---
+
+### 🔹 Deliverables
+- Update `/help` to list:  
