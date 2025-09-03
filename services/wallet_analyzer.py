@@ -67,8 +67,29 @@ class WalletAnalyzer:
     """Comprehensive wallet and token analyzer"""
     
     def __init__(self):
-        self.covalent_client = CovalentClient()
-        self.goplus_client = None
+        # Initialize clients with API keys if available
+        try:
+            from config import Config
+            if Config.COVALENT_API_KEY:
+                self.covalent_client = CovalentClient(Config.COVALENT_API_KEY)
+            else:
+                self.covalent_client = None
+                logger.warning("Covalent API key not configured - wallet analysis features limited")
+        except Exception as e:
+            self.covalent_client = None
+            logger.warning(f"Failed to initialize Covalent client: {e}")
+        
+        try:
+            from config import Config
+            if Config.GOPLUS_API_KEY:
+                self.goplus_client = GoPlusClient(Config.GOPLUS_API_KEY)
+            else:
+                self.goplus_client = None
+                logger.warning("GoPlus API key not configured - security features limited")
+        except Exception as e:
+            self.goplus_client = None
+            logger.warning(f"Failed to initialize GoPlus client: {e}")
+        
         self.cache = {}
         self.cache_ttl = 600  # 10 minutes
         

@@ -9,7 +9,7 @@ from eth_account import Account
 from eth_keyfile import extract_key_from_keyfile
 import requests
 from config import Config
-from db import get_db_session, Trade, User, Wallet
+from db import get_db_session, Trade, User, WalletWatch
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +19,25 @@ class ChainConfig:
     def __init__(self, chain_id: int):
         self.chain_id = chain_id
         
-        if chain_id == 11155111:  # Sepolia
+        if chain_id == 1:  # Ethereum mainnet
+            self.rpc_url = Config.ETHEREUM_RPC_URL
+            self.api_url = Config.ZEROEX_ETH_API
+            self.wrapped_native = Config.WETH_ADDRESS
+            self.router = Config.UNISWAP_V2_ROUTER
+            self.name = 'ethereum-mainnet'
+        elif chain_id == 56:  # BSC mainnet
+            self.rpc_url = Config.BSC_RPC_URL
+            self.api_url = Config.ZEROEX_BSC_API
+            self.wrapped_native = Config.WBNB_ADDRESS
+            self.router = Config.PANCAKESWAP_ROUTER
+            self.name = 'bsc-mainnet'
+        elif chain_id == 11155111:  # Sepolia testnet (fallback)
             self.rpc_url = Config.ETHEREUM_RPC_URL
             self.api_url = Config.ZEROEX_ETH_API
             self.wrapped_native = Config.WETH_SEPOLIA
             self.router = Config.UNISWAP_V2_ROUTER
-            self.name = 'sepolia'
-        elif chain_id == 97:  # BSC Testnet
+            self.name = 'sepolia-testnet'
+        elif chain_id == 97:  # BSC Testnet (fallback)
             self.rpc_url = Config.BSC_RPC_URL
             self.api_url = Config.ZEROEX_BSC_API
             self.wrapped_native = Config.WBNB_TESTNET
@@ -37,7 +49,7 @@ class ChainConfig:
 class AdvancedTradeExecutor:
     """Advanced trade executor with 0x Protocol integration and proper gas handling"""
     
-    def __init__(self, chain_id: int = 11155111):
+    def __init__(self, chain_id: int = 1):  # Default to Ethereum mainnet
         self.chain_config = ChainConfig(chain_id)
         self.web3 = Web3(Web3.HTTPProvider(self.chain_config.rpc_url))
         

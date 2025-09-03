@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 from web3 import Web3
 from config import Config
-from db import get_db_session, Token, Wallet, Transaction, MonitoringAlert
+from db import get_db_session, Token, WalletWatch
 from utils.api_client import CovalentClient
 
 logger = logging.getLogger(__name__)

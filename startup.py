@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def initialize_integrations():
     """Initialize all API integrations"""
     try:
-        logger.info("🔄 Initializing API integrations...")
+        logger.info("Initializing API integrations...")
         
         # Initialize 0x clients for different chains
         if Config.ZEROX_API_KEY:
@@ -33,59 +33,59 @@ async def initialize_integrations():
             # Default 0x client (for backward compatibility)
             integration_manager.register_client('zerox', zerox_eth)
             
-            logger.info("✅ 0x Protocol clients initialized")
+            logger.info("0x Protocol clients initialized")
         else:
-            logger.warning("⚠️ 0x API key not found")
+            logger.warning("0x API key not found")
         
         # Initialize Jupiter client for Solana
         jupiter_client = JupiterClient()
         integration_manager.register_client('jupiter', jupiter_client)
-        logger.info("✅ Jupiter client initialized")
+        logger.info("Jupiter client initialized")
         
         # Initialize CoinGecko client
         if Config.COINGECKO_API_KEY:
             coingecko_client = CoinGeckoClient(Config.COINGECKO_API_KEY)
             integration_manager.register_client('coingecko', coingecko_client)
-            logger.info("✅ CoinGecko client initialized")
+            logger.info("CoinGecko client initialized")
         else:
-            logger.warning("⚠️ CoinGecko API key not found")
+            logger.warning("CoinGecko API key not found")
         
         # Initialize GoPlus client
         if Config.GOPLUS_API_KEY:
             goplus_client = GoPlusClient(Config.GOPLUS_API_KEY)
             integration_manager.register_client('goplus', goplus_client)
-            logger.info("✅ GoPlus client initialized")
+            logger.info("GoPlus client initialized")
         else:
-            logger.warning("⚠️ GoPlus API key not found")
+            logger.warning("GoPlus API key not found")
         
         # Initialize Covalent client
         if Config.COVALENT_API_KEY:
             covalent_client = CovalentClient(Config.COVALENT_API_KEY)
             integration_manager.register_client('covalent', covalent_client)
-            logger.info("✅ Covalent client initialized")
+            logger.info("Covalent client initialized")
         else:
-            logger.warning("⚠️ Covalent API key not found")
+            logger.warning("Covalent API key not found")
         
         # Health check all clients
-        logger.info("🔍 Running health checks...")
+        logger.info("Running health checks...")
         health_results = await integration_manager.health_check_all()
         
         healthy_clients = sum(1 for status in health_results.values() if status)
         total_clients = len(health_results)
         
-        logger.info(f"📊 Health check results: {healthy_clients}/{total_clients} clients healthy")
+        logger.info(f"Health check results: {healthy_clients}/{total_clients} clients healthy")
         
         for client_name, is_healthy in health_results.items():
-            status = "✅ HEALTHY" if is_healthy else "❌ UNHEALTHY"
-            logger.info(f"  • {client_name}: {status}")
+            status = "HEALTHY" if is_healthy else "UNHEALTHY"
+            logger.info(f"  - {client_name}: {status}")
         
         if healthy_clients == 0:
-            logger.error("❌ No healthy clients found! Check API keys and network connectivity.")
+            logger.error("No healthy clients found! Check API keys and network connectivity.")
             return False
         elif healthy_clients < total_clients:
-            logger.warning(f"⚠️ {total_clients - healthy_clients} clients are unhealthy. Some features may be limited.")
+            logger.warning(f"{total_clients - healthy_clients} clients are unhealthy. Some features may be limited.")
         
-        logger.info("🚀 Integration initialization completed successfully!")
+        logger.info("Integration initialization completed successfully.")
         return True
         
     except Exception as e:

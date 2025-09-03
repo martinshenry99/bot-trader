@@ -1,0 +1,269 @@
+2025-09-02 22:31:19,055 - db - INFO - Database initialized successfully
+2025-09-02 22:31:19,608 - utils.key_manager - INFO - Loaded keys: 9 total
+2025-09-02 22:31:21,009 - integrations.base - ERROR - API error 404: {
+  "message":"no Route matched with those values",
+  "request_id":"ac04905c3681e863d5fe1450b15c514c"
+}
+2025-09-02 22:31:22,050 - integrations.base - ERROR - API error 404: {
+  "message":"no Route matched with those values",
+  "request_id":"20640c208ee069227ba1a30fb2a9fd79"
+}
+2025-09-02 22:31:22,316 - integrations.base - ERROR - API error 404: {
+  "message":"no Route matched with those values",
+  "request_id":"8dcddd4f9e14b50593b5ac767aca6f26"
+}
+2025-09-02 22:31:23,372 - integrations.base - ERROR - API error 404: 
+2025-09-02 22:31:27,098 - integrations.base - ERROR - API error 403: <!DOCTYPE html>
+<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+<head>
+<title>Attention Required! | Cloudflare</title>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+<!--[if lt IE 9]><link rel="stylesheet" id='cf_styles-ie-css' href="/cdn-cgi/styles/cf.errors.ie.css" /><![endif]-->
+<style>body{margin:0;padding:0}</style>
+
+
+<!--[if gte IE 10]><!-->
+<script>
+  if (!navigator.cookieEnabled) {
+    window.addEventListener('DOMContentLoaded', function () {
+      var cookieEl = document.getElementById('cookie-alert');
+      cookieEl.style.display = 'block';
+    })
+  }
+</script>
+<!--<![endif]-->
+
+</head>
+<body>
+  <div id="cf-wrapper">
+    <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+    <div id="cf-error-details" class="cf-error-details-wrapper">
+      <div class="cf-wrapper cf-header cf-error-overview">
+        <h1 data-translate="block_headline">Sorry, you have been blocked</h1>
+        <h2 class="cf-subheadline"><span data-translate="unable_to_access">You are unable to access</span> covalenthq.com</h2>
+      </div><!-- /.header -->
+
+      <div class="cf-section cf-highlight">
+        <div class="cf-wrapper">
+          <div class="cf-screenshot-container cf-screenshot-full">
+            
+              <span class="cf-no-screenshot error"></span>
+            
+          </div>
+        </div>
+      </div><!-- /.captcha-container -->
+
+      <div class="cf-section cf-wrapper">
+        <div class="cf-columns two">
+          <div class="cf-column">
+            <h2 data-translate="blocked_why_headline">Why have I been blocked?</h2>
+
+            <p data-translate="blocked_why_detail">This website is using a security service to protect itself from online attacks. The action you just performed triggered the security solution. There are several actions that could trigger this block including submitting a certain word or phrase, a SQL command or malformed data.</p>
+          </div>
+
+          <div class="cf-column">
+            <h2 data-translate="blocked_resolve_headline">What can I do to resolve this?</h2>
+
+            <p data-translate="blocked_resolve_detail">You can email the site owner to let them know you were blocked. Please include what you were doing when this page came up and the Cloudflare Ray ID found at the bottom of this page.</p>
+          </div>
+        </div>
+      </div><!-- /.section -->
+
+      <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+    <p class="text-13">
+      <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">97901d3ebd12b945</strong></span>
+      <span class="cf-footer-separator sm:hidden">&bull;</span>
+      <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+        Your IP:
+        <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+        <span class="hidden" id="cf-footer-ip">185.132.179.14</span>
+        <span class="cf-footer-separator sm:hidden">&bull;</span>
+      </span>
+      <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+      
+    </p>
+    <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+  </div><!-- /.error-footer -->
+
+    </div><!-- /#cf-error-details -->
+  </div><!-- /#cf-wrapper -->
+
+  <script>
+    window._cf_translation = {};
+    
+    
+  </script>
+</body>
+</html>
+2025-09-02 22:31:30,633 - core.wallet_manager - INFO - Loaded 0 wallets
+2025-09-02 22:31:32,415 - executor - INFO - Initialized executor for ethereum-mainnet (EIP-1559: True)
+2025-09-02 22:31:32,416 - pro_features - INFO - ProFeaturesManager initialized (AI features disabled)
+2025-09-02 22:31:33,884 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001A4CF8070E0>
+2025-09-02 22:31:33,885 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001A4CFD1C690>
+2025-09-02 22:31:33,886 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001A4CFD1CF50>
+2025-09-02 22:31:33,886 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001A4CFD1D590>
+2025-09-02 22:31:33,887 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001A4CFD1DA90>
+2025-09-02 22:31:33,888 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001A4CFD1DE50>
+2025-09-02 22:31:33,888 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001A4CFC9FFB0>, 2716568.5129688)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001A4CF807230>
+2025-09-02 22:31:33,889 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001A4CFCF80B0>, 2716568.2473789)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001A4CFD1C7D0>
+2025-09-02 22:31:33,890 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001A4CFCFB050>, 2716569.5696387)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001A4CFD1D310>
+2025-09-02 22:31:33,891 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001A4CFCFB350>, 2716570.90738)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001A4CFD1D950>
+2025-09-02 22:31:33,892 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001A4CFCFB650>, 2716572.2830727)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001A4CFD1DD10>
+2025-09-02 22:31:33,892 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001A4CFCFB110>, 2716573.2940472)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001A4CFD1E0D0>
+2025-09-03 10:06:56,431 - __main__ - INFO - Starting Meme Trader V4 Pro...
+2025-09-03 10:06:56,457 - __main__ - ERROR - Configuration error: Missing required environment variables: COVALENT_API_KEY
+2025-09-03 10:06:56,457 - __main__ - ERROR - Please check your .env file and ensure all required variables are set
+2025-09-03 10:06:56,458 - __main__ - ERROR - See env_template.txt for required variables
+2025-09-03 10:09:13,710 - __main__ - INFO - Starting Meme Trader V4 Pro...
+2025-09-03 10:09:13,723 - __main__ - WARNING - Covalent keys not configured – discovery/analysis features will be limited
+2025-09-03 10:09:13,723 - __main__ - INFO - Configuration validated (with possible warnings)
+2025-09-03 10:09:13,724 - __main__ - INFO - Initializing database...
+2025-09-03 10:09:13,755 - db.models - INFO - Database initialized successfully
+2025-09-03 10:09:13,759 - db.models - INFO - Database initialized successfully
+2025-09-03 10:09:13,759 - __main__ - INFO - Database initialized
+2025-09-03 10:09:13,759 - __main__ - INFO - Initializing API integrations...
+2025-09-03 10:09:14,194 - utils.key_manager - INFO - Total covalent keys loaded: 0
+2025-09-03 10:09:14,195 - utils.key_manager - INFO - Total helius keys loaded: 0
+2025-09-03 10:09:14,195 - utils.key_manager - INFO - Total etherscan keys loaded: 0
+2025-09-03 10:09:14,195 - utils.key_manager - INFO - Total bscscan keys loaded: 0
+2025-09-03 10:09:14,196 - utils.key_manager - INFO - Loaded 1 goplus keys from fallback format
+2025-09-03 10:09:14,196 - utils.key_manager - INFO - Total goplus keys loaded: 1
+2025-09-03 10:09:14,197 - utils.key_manager - INFO - Loaded 1 coingecko keys from fallback format
+2025-09-03 10:09:14,197 - utils.key_manager - INFO - Total coingecko keys loaded: 1
+2025-09-03 10:09:15,922 - integrations.base - ERROR - API error 404: 
+2025-09-03 10:09:18,740 - __main__ - INFO - Starting Telegram bot...
+2025-09-03 10:09:20,657 - __main__ - ERROR - Startup failed: 'Updater' object has no attribute '_Updater__polling_cleanup_cb' and no __dict__ for setting new attributes
+2025-09-03 10:09:20,694 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E6628D41A0>
+2025-09-03 10:09:20,695 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E6628E42D0>
+2025-09-03 10:09:20,696 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E6628E5450>
+2025-09-03 10:09:20,696 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E6628CABD0>, 2758442.1187537)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E6628D42F0>
+2025-09-03 10:09:20,697 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E6628CB470>, 2758443.6228052)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E6628E4910>
+2025-09-03 10:09:20,698 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E6628CB7D0>, 2758444.8988997)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E6628E4E10>
+2025-09-03 10:11:54,686 - __main__ - INFO - Starting Meme Trader V4 Pro...
+2025-09-03 10:11:54,708 - __main__ - WARNING - Covalent keys not configured – discovery/analysis features will be limited
+2025-09-03 10:11:54,709 - __main__ - INFO - Configuration validated (with possible warnings)
+2025-09-03 10:11:54,710 - __main__ - INFO - Initializing database...
+2025-09-03 10:11:54,735 - db.models - INFO - Database initialized successfully
+2025-09-03 10:11:54,739 - db.models - INFO - Database initialized successfully
+2025-09-03 10:11:54,740 - __main__ - INFO - Database initialized
+2025-09-03 10:11:54,741 - __main__ - INFO - Initializing API integrations...
+2025-09-03 10:11:55,230 - utils.key_manager - INFO - Total covalent keys loaded: 0
+2025-09-03 10:11:55,230 - utils.key_manager - INFO - Total helius keys loaded: 0
+2025-09-03 10:11:55,231 - utils.key_manager - INFO - Total etherscan keys loaded: 0
+2025-09-03 10:11:55,231 - utils.key_manager - INFO - Total bscscan keys loaded: 0
+2025-09-03 10:11:55,232 - utils.key_manager - INFO - Loaded 1 goplus keys from fallback format
+2025-09-03 10:11:55,234 - utils.key_manager - INFO - Total goplus keys loaded: 1
+2025-09-03 10:11:55,234 - utils.key_manager - INFO - Loaded 1 coingecko keys from fallback format
+2025-09-03 10:11:55,235 - utils.key_manager - INFO - Total coingecko keys loaded: 1
+2025-09-03 10:11:56,377 - integrations.base - ERROR - API error 404: 
+2025-09-03 10:11:59,654 - __main__ - ERROR - Startup failed: name 'integrations_ok' is not defined
+2025-09-03 10:11:59,656 - __main__ - ERROR - Fatal error: a coroutine was expected, got False
+2025-09-03 10:13:36,781 - __main__ - INFO - Starting Meme Trader V4 Pro...
+2025-09-03 10:13:36,887 - __main__ - WARNING - Covalent keys not configured – discovery/analysis features will be limited
+2025-09-03 10:13:36,897 - __main__ - INFO - Configuration validated (with possible warnings)
+2025-09-03 10:13:36,906 - __main__ - INFO - Initializing database...
+2025-09-03 10:13:36,944 - db.models - INFO - Database initialized successfully
+2025-09-03 10:13:36,947 - db.models - INFO - Database initialized successfully
+2025-09-03 10:13:36,948 - __main__ - INFO - Database initialized
+2025-09-03 10:13:36,948 - __main__ - INFO - Initializing API integrations...
+2025-09-03 10:13:37,557 - utils.key_manager - INFO - Total covalent keys loaded: 0
+2025-09-03 10:13:37,557 - utils.key_manager - INFO - Total helius keys loaded: 0
+2025-09-03 10:13:37,558 - utils.key_manager - INFO - Total etherscan keys loaded: 0
+2025-09-03 10:13:37,558 - utils.key_manager - INFO - Total bscscan keys loaded: 0
+2025-09-03 10:13:37,558 - utils.key_manager - INFO - Loaded 1 goplus keys from fallback format
+2025-09-03 10:13:37,558 - utils.key_manager - INFO - Total goplus keys loaded: 1
+2025-09-03 10:13:37,559 - utils.key_manager - INFO - Loaded 1 coingecko keys from fallback format
+2025-09-03 10:13:37,559 - utils.key_manager - INFO - Total coingecko keys loaded: 1
+2025-09-03 10:13:37,562 - startup - INFO - Initializing API integrations...
+2025-09-03 10:13:37,577 - startup - INFO - Jupiter client initialized
+2025-09-03 10:13:37,578 - startup - INFO - CoinGecko client initialized
+2025-09-03 10:13:37,578 - startup - INFO - GoPlus client initialized
+2025-09-03 10:13:37,588 - startup - INFO - Running health checks...
+2025-09-03 10:13:38,283 - integrations.base - ERROR - API error 404: 
+2025-09-03 10:13:40,558 - startup - INFO - Health check results: 2/3 clients healthy
+2025-09-03 10:13:40,559 - startup - INFO -   - jupiter: UNHEALTHY
+2025-09-03 10:13:40,559 - startup - INFO -   - coingecko: HEALTHY
+2025-09-03 10:13:40,559 - startup - INFO -   - goplus: HEALTHY
+2025-09-03 10:13:40,560 - startup - WARNING - 1 clients are unhealthy. Some features may be limited.
+2025-09-03 10:13:40,560 - startup - INFO - Integration initialization completed successfully.
+2025-09-03 10:13:40,563 - __main__ - ERROR - Startup failed: name 'integrations_ok' is not defined
+2025-09-03 10:14:13,976 - __main__ - INFO - Starting Meme Trader V4 Pro...
+2025-09-03 10:14:13,988 - __main__ - WARNING - Covalent keys not configured – discovery/analysis features will be limited
+2025-09-03 10:14:13,989 - __main__ - INFO - Configuration validated (with possible warnings)
+2025-09-03 10:14:13,991 - __main__ - INFO - Initializing database...
+2025-09-03 10:14:14,017 - db.models - INFO - Database initialized successfully
+2025-09-03 10:14:14,022 - db.models - INFO - Database initialized successfully
+2025-09-03 10:14:14,022 - __main__ - INFO - Database initialized
+2025-09-03 10:14:14,022 - __main__ - INFO - Initializing API integrations...
+2025-09-03 10:14:14,555 - utils.key_manager - INFO - Total covalent keys loaded: 0
+2025-09-03 10:14:14,555 - utils.key_manager - INFO - Total helius keys loaded: 0
+2025-09-03 10:14:14,556 - utils.key_manager - INFO - Total etherscan keys loaded: 0
+2025-09-03 10:14:14,557 - utils.key_manager - INFO - Total bscscan keys loaded: 0
+2025-09-03 10:14:14,560 - utils.key_manager - INFO - Loaded 1 goplus keys from fallback format
+2025-09-03 10:14:14,561 - utils.key_manager - INFO - Total goplus keys loaded: 1
+2025-09-03 10:14:14,562 - utils.key_manager - INFO - Loaded 1 coingecko keys from fallback format
+2025-09-03 10:14:14,562 - utils.key_manager - INFO - Total coingecko keys loaded: 1
+2025-09-03 10:14:14,566 - startup - INFO - Initializing API integrations...
+2025-09-03 10:14:14,584 - startup - INFO - Jupiter client initialized
+2025-09-03 10:14:14,585 - startup - INFO - CoinGecko client initialized
+2025-09-03 10:14:14,586 - startup - INFO - GoPlus client initialized
+2025-09-03 10:14:14,594 - startup - INFO - Running health checks...
+2025-09-03 10:14:15,370 - integrations.base - ERROR - API error 404: 
+2025-09-03 10:14:17,524 - startup - INFO - Health check results: 2/3 clients healthy
+2025-09-03 10:14:17,524 - startup - INFO -   - jupiter: UNHEALTHY
+2025-09-03 10:14:17,525 - startup - INFO -   - coingecko: HEALTHY
+2025-09-03 10:14:17,525 - startup - INFO -   - goplus: HEALTHY
+2025-09-03 10:14:17,525 - startup - WARNING - 1 clients are unhealthy. Some features may be limited.
+2025-09-03 10:14:17,526 - startup - INFO - Integration initialization completed successfully.
+2025-09-03 10:14:17,527 - __main__ - INFO - Starting Telegram bot...
+2025-09-03 10:14:19,504 - __main__ - ERROR - Startup failed: 'Updater' object has no attribute '_Updater__polling_cleanup_cb' and no __dict__ for setting new attributes
+2025-09-03 10:14:19,563 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001BADF0241A0>
+2025-09-03 10:14:19,566 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001BADF034190>
+2025-09-03 10:14:19,566 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001BADF035310>
+2025-09-03 10:14:19,567 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001BADF01ADB0>, 2758741.5672039)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001BADF0242F0>
+2025-09-03 10:14:19,568 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001BADF01B650>, 2758742.4965901)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001BADF0347D0>
+2025-09-03 10:14:19,569 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001BADF01B9B0>, 2758743.7207484)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001BADF034CD0>

@@ -6,7 +6,7 @@ import os
 import json
 import secrets
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 from eth_account import Account
 from eth_keyfile import extract_key_from_keyfile
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class WalletManager:
     """Secure multi-wallet keystore manager"""
     
-    def __init__(self, keystore_dir: str = "/app/keystores", password: Optional[str] = None):
+    def __init__(self, keystore_dir: str = "./keystores", password: Optional[str] = None):
         self.keystore_dir = Path(keystore_dir)
         self.keystore_dir.mkdir(exist_ok=True)
         
@@ -398,7 +398,7 @@ class WalletManager:
             logger.error(f"Failed to get next wallet: {e}")
             return None
     
-    def health_check(self) -> Dict[str, any]:
+    def health_check(self) -> Dict[str, Any]:
         """
         Perform health check on wallet manager
         

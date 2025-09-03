@@ -1,0 +1,72 @@
+# Meme Trader V4 Pro Environment Configuration
+# Copy this file to .env and fill in your actual values
+
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# API Key Rotation (Preferred format - comma-separated)
+COVALENT_KEYS=key1,key2,key3
+HELIUS_KEYS=key1,key2,key3
+ETH_KEYS=key1,key2,key3
+BSC_KEYS=key1,key2,key3
+GOPLUS_KEYS=key1,key2
+COINGECKO_KEYS=key1,key2
+
+# Alternative format (fallback for legacy envs)
+# COVALENT_KEY_1=key1
+# COVALENT_KEY_2=key2
+# COVALENT_KEY_3=key3
+# HELIUS_KEY_1=key1
+# HELIUS_KEY_2=key2
+# ETH_KEY_1=key1
+# ETH_KEY_2=key2
+# ETH_KEY_3=key3
+# BSC_KEY_1=key1
+# BSC_KEY_2=key2
+# BSC_KEY_3=key3
+
+# Legacy single key format (fallback)
+# COVALENT_API_KEY=legacy_key
+# HELIUS_API_KEY=legacy_key
+# ETHEREUM_API_KEY=legacy_key
+# BSC_API_KEY=legacy_key
+# GOPLUS_API_KEY=legacy_key
+# COINGECKO_API_KEY=legacy_key
+
+# RPC Endpoints
+ETHEREUM_RPC_URL=https://eth.llamarpc.com
+BSC_RPC_URL=https://bsc-dataseed1.binance.org
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+
+# Scanner Configuration
+SCAN_INTERVAL_SECONDS=3600
+WATCHLIST_POLL_SECONDS=60
+CACHE_TTL_SECONDS=600
+SCAN_MIN_SCORE=70
+
+# Graph Analysis Configuration
+GRAPH_BREADTH_LIMIT=50
+GRAPH_DEPTH_LIMIT=3
+
+# Mirror Trading Configuration
+MIRROR_CONFIRM=false
+MIRROR_CONFIRM_TIMEOUT=30
+
+# Safety Configuration
+SAFE_MODE=true
+MIRROR_SELL=true
+MIRROR_BUY=false
+
+# Optional: 12-word mnemonic for wallet operations
+# MNEMONIC=word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12
+
+# Database Configuration
+DATABASE_URL=sqlite:///meme_trader.db
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=bot.log
+
+# Development Configuration
+DEBUG=false
+TEST_MODE=false 

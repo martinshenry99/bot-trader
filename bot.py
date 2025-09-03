@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from web3 import Web3
 
 from config import Config
-from db import create_tables, get_db_session, User, Wallet, Token, Trade, AlertConfig, BlacklistEntry, WalletWatch, ExecutorWallet
+from db import create_tables, get_db_session, User, WalletWatch, Token, Trade, AlertConfig, BlacklistEntry, ExecutorWallet
 from monitor import EnhancedMonitoringManager
 from analyzer import EnhancedTokenAnalyzer
 from executor import AdvancedTradeExecutor, KeystoreManager

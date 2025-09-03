@@ -4,22 +4,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    # Telegram
-    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY')
+    # Telegram - REQUIRED - No default value for security
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     
-    # API Keys
+    # API Keys - REQUIRED for core functionality
     COVALENT_API_KEY = os.getenv('COVALENT_API_KEY')
     ZEROX_API_KEY = os.getenv('ZEROX_API_KEY')
     GOPLUS_API_KEY = os.getenv('GOPLUS_API_KEY') 
     COINGECKO_API_KEY = os.getenv('COINGECKO_API_KEY')
     
     # Ethereum Mainnet Configuration
-    ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://eth-mainnet.g.alchemy.com/v2/')
+    ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://eth.llamarpc.com')
     CHAIN_ID = int(os.getenv('CHAIN_ID', '1'))  # Ethereum mainnet
     NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
     
     # BSC Mainnet Configuration  
-    BSC_RPC_URL = os.getenv('BSC_RPC_URL', 'https://bnb-mainnet.g.alchemy.com/v2/')
+    BSC_RPC_URL = os.getenv('BSC_RPC_URL', 'https://bsc-dataseed1.binance.org')
     BSC_CHAIN_ID = int(os.getenv('BSC_CHAIN_ID', '56'))  # BSC mainnet
     BSC_NETWORK_NAME = os.getenv('BSC_NETWORK_NAME', 'bsc-mainnet')
     
@@ -73,6 +73,28 @@ class Config:
     WBNB_ADDRESS = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'  # BSC mainnet
     WSOL_ADDRESS = 'So11111111111111111111111111111111111111112'  # Solana wrapped SOL
     USDC_ADDRESS = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana USDC
+    
+    # Testnet token addresses (for executor.py compatibility)
+    WETH_SEPOLIA = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9'
+    WBNB_TESTNET = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'
+    
+    # Scanner Configuration
+    SCAN_INTERVAL_SECONDS = int(os.getenv('SCAN_INTERVAL_SECONDS', '3600'))  # hourly discovery job
+    WATCHLIST_POLL_SECONDS = int(os.getenv('WATCHLIST_POLL_SECONDS', '60'))  # monitor check interval
+    CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', '600'))  # TTL for heavy API lookups
+    SCAN_MIN_SCORE = int(os.getenv('SCAN_MIN_SCORE', '70'))  # only return wallets scored >= 70
+    
+    # Graph Analysis Configuration
+    GRAPH_BREADTH_LIMIT = int(os.getenv('GRAPH_BREADTH_LIMIT', '50'))  # nodes per depth
+    GRAPH_DEPTH_LIMIT = int(os.getenv('GRAPH_DEPTH_LIMIT', '3'))  # max depth for analysis
+    
+    # Mirror Trading Configuration
+    MIRROR_CONFIRM = os.getenv('MIRROR_CONFIRM', 'false').lower() == 'true'  # require confirmation
+    MIRROR_CONFIRM_TIMEOUT = int(os.getenv('MIRROR_CONFIRM_TIMEOUT', '30'))  # confirmation timeout in seconds
+    
+    # Router Addresses for Honeypot Simulation
+    UNISWAP_V2_ROUTER = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+    PANCAKESWAP_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E'
     
     @classmethod
     def get_wrapped_native_token(cls, chain_id: int) -> str:
