@@ -52,7 +52,8 @@ class CovalentClient:
     """Covalent API client with key rotation and comprehensive wallet analysis"""
     
     def __init__(self):
-        self.base_url = "https://api.covalenthq.com/v1"
+        # Allow overriding base via env if needed
+        self.base_url = getattr(Config, 'COVALENT_API_BASE', None) or "https://api.covalenthq.com/v1"
         self.session = None
         self.cache = {}
         self.cache_ttl = Config.CACHE_TTL_SECONDS
@@ -61,8 +62,18 @@ class CovalentClient:
         """Get or create aiohttp session"""
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=30),
-                headers={'User-Agent': 'MemeTrader/1.0'}
+                timeout=aiohttp.ClientTimeout(total=45),
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MemeTrader/1.0',
+                    'Accept': 'application/json, text/plain, */*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Origin': 'https://www.covalenthq.com',
+                    'Referer': 'https://www.covalenthq.com/',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+                    'Connection': 'keep-alive'
+                },
+                trust_env=True
             )
         return self.session
     
@@ -80,10 +91,11 @@ class CovalentClient:
                 url = f"{self.base_url}{endpoint}"
                 if params is None:
                     params = {}
-                params['key'] = api_key
+                # Prefer header-based auth to reduce query param blocking
+                request_headers = {'x-api-key': api_key}
                 
                 session = await self._get_session()
-                async with session.get(url, params=params) as response:
+                async with session.get(url, params=params, headers=request_headers) as response:
                     if response.status == 200:
                         data = await response.json()
                         if data.get('error') or data.get('error_code'):
@@ -104,6 +116,18 @@ class CovalentClient:
                         if attempt < max_retries - 1:
                             continue
                     
+                    elif response.status == 403:
+                        body = await response.text()
+                        if 'Cloudflare' in body or 'blocked' in body:
+                            logger.error("Covalent request blocked by Cloudflare (HTTP 403). Consider using residential IP or proxy.")
+                        else:
+                            logger.error(f"HTTP 403: {body}")
+                        # Cooldown the key briefly and try next key if available
+                        mark_key_rate_limited('covalent', api_key)
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1)
+                            continue
+                        return None
                     else:
                         logger.error(f"HTTP {response.status}: {await response.text()}")
                         if attempt < max_retries - 1:

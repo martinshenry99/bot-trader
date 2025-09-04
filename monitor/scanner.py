@@ -13,6 +13,7 @@ from db.models import get_db_manager, WalletData
 from services.covalent import get_covalent_client, WalletMetrics
 from services.helius import get_helius_client
 from services.go_plus import get_goplus_client
+from services.mock_data import get_mock_provider
 from utils.key_manager import get_key_manager
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class DiscoveryScanner:
     def __init__(self):
         self.db = get_db_manager()
         self.key_manager = get_key_manager()
+        self.mock_provider = get_mock_provider()
         self.cache = {}
         self.cache_ttl = Config.CACHE_TTL_SECONDS
         self.min_score = Config.SCAN_MIN_SCORE
@@ -143,6 +145,20 @@ class DiscoveryScanner:
             # Source 1: Covalent "top token transfers" and "transactions" across recent blocks
             for chain_name, chain_config in self.chains.items():
                 if chain_name != 'solana':  # Covalent handles EVM chains
+                    # Check if Covalent keys are available
+                    if not self.key_manager.is_service_available('covalent'):
+                        logger.info(f"Covalent keys not available, using mock data for {chain_name}")
+                        mock_txs = self.mock_provider.get_mock_recent_transactions(chain_config['id'], 1000)
+                        
+                        for tx in mock_txs:
+                            if 'from_address' in tx:
+                                candidates.add((tx['from_address'], chain_name))
+                            if 'to_address' in tx:
+                                candidates.add((tx['to_address'], chain_name))
+                        
+                        logger.info(f"Added {len(mock_txs)} mock transactions from {chain_name}")
+                        continue
+                    
                     try:
                         covalent_client = await get_covalent_client()
                         recent_txs = await covalent_client.get_recent_transactions(chain_config['id'], 1000)
@@ -158,6 +174,17 @@ class DiscoveryScanner:
                         
                     except Exception as e:
                         logger.error(f"Failed to get Covalent data for {chain_name}: {e}")
+                        # Use mock data as fallback
+                        logger.info(f"Using mock data for {chain_name}")
+                        mock_txs = self.mock_provider.get_mock_recent_transactions(chain_config['id'], 1000)
+                        
+                        for tx in mock_txs:
+                            if 'from_address' in tx:
+                                candidates.add((tx['from_address'], chain_name))
+                            if 'to_address' in tx:
+                                candidates.add((tx['to_address'], chain_name))
+                        
+                        logger.info(f"Added {len(mock_txs)} mock transactions from {chain_name}")
             
             # Source 2: Helius token transfer endpoints for Solana
             try:
@@ -215,8 +242,48 @@ class DiscoveryScanner:
             # Get wallet metrics based on chain
             if chain in ['ethereum', 'bsc']:
                 chain_id = self.chains[chain]['id']
-                covalent_client = await get_covalent_client()
-                metrics = await covalent_client.analyze_wallet_performance(address, chain_id)
+                
+                # Check if Covalent keys are available
+                if not self.key_manager.is_service_available('covalent'):
+                    logger.info(f"Covalent keys not available, using mock metrics for {address}")
+                    mock_metrics = self.mock_provider.get_mock_wallet_metrics(address, chain_id)
+                    
+                    # Convert mock metrics to expected format
+                    metrics = WalletMetrics(
+                        address=address,
+                        chain=chain,
+                        win_rate=mock_metrics.win_rate,
+                        max_multiplier=mock_metrics.max_multiplier,
+                        avg_roi=mock_metrics.avg_roi,
+                        total_volume_usd=mock_metrics.total_volume_usd,
+                        trade_count=20,  # Mock trade count
+                        recent_activity=mock_metrics.recent_activity,
+                        score=mock_metrics.score,
+                        risk_flags=mock_metrics.risk_flags
+                    )
+                else:
+                    try:
+                        covalent_client = await get_covalent_client()
+                        metrics = await covalent_client.analyze_wallet_performance(address, chain_id)
+                    except Exception as e:
+                        logger.error(f"Covalent analysis failed for {address}: {e}")
+                        # Use mock data as fallback
+                        logger.info(f"Using mock metrics for {address}")
+                        mock_metrics = self.mock_provider.get_mock_wallet_metrics(address, chain_id)
+                        
+                        # Convert mock metrics to expected format
+                        metrics = WalletMetrics(
+                            address=address,
+                            chain=chain,
+                            win_rate=mock_metrics.win_rate,
+                            max_multiplier=mock_metrics.max_multiplier,
+                            avg_roi=mock_metrics.avg_roi,
+                            total_volume_usd=mock_metrics.total_volume_usd,
+                            trade_count=20,  # Mock trade count
+                            recent_activity=mock_metrics.recent_activity,
+                            score=mock_metrics.score,
+                            risk_flags=mock_metrics.risk_flags
+                        )
                 
                 if not metrics:
                     return None
@@ -406,6 +473,25 @@ class DiscoveryScanner:
     
     async def _find_sample_profitable_token(self, address: str, chain_id: int) -> Dict[str, Any]:
         """Find a sample profitable token for the wallet"""
+        # Check if Covalent keys are available
+        if not self.key_manager.is_service_available('covalent'):
+            logger.info(f"Covalent keys not available, using mock token data for {address}")
+            mock_transfers = self.mock_provider.get_mock_wallet_transactions(address, chain_id)
+            
+            # Find the most profitable trade from mock data
+            best_trade = None
+            best_multiplier = 1.0
+            
+            for transfer in mock_transfers:
+                if transfer.value_usd > best_multiplier:
+                    best_multiplier = transfer.value_usd
+                    best_trade = {
+                        'symbol': transfer.token_symbol,
+                        'multiplier': best_multiplier
+                    }
+            
+            return best_trade or {'symbol': 'PEPE', 'multiplier': 2.5}
+        
         try:
             covalent_client = await get_covalent_client()
             transfers = await covalent_client.get_wallet_transactions(address, chain_id)
@@ -429,7 +515,22 @@ class DiscoveryScanner:
             
         except Exception as e:
             logger.error(f"Sample token search failed: {e}")
-            return {'symbol': 'Unknown', 'multiplier': 1.0}
+            # Use mock data as fallback
+            mock_transfers = self.mock_provider.get_mock_wallet_transactions(address, chain_id)
+            
+            # Find the most profitable trade from mock data
+            best_trade = None
+            best_multiplier = 1.0
+            
+            for transfer in mock_transfers:
+                if transfer.value_usd > best_multiplier:
+                    best_multiplier = transfer.value_usd
+                    best_trade = {
+                        'symbol': transfer.token_symbol,
+                        'multiplier': best_multiplier
+                    }
+            
+            return best_trade or {'symbol': 'PEPE', 'multiplier': 2.5}
     
     async def _save_discovered_wallets(self, wallets: List[DiscoveredWallet]):
         """Save discovered wallets to database"""

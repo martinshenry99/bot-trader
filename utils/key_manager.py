@@ -32,19 +32,25 @@ class KeyRotationManager:
         self.keys: Dict[str, List[KeyInfo]] = {}
         self.service_configs = {
             'covalent': {
-                'env_keys': ['COVALENT_KEYS', 'COVALENT_KEY_1', 'COVALENT_KEY_2', 'COVALENT_KEY_3'],
+                'env_keys': [
+                    # Preferred comma-separated variants
+                    'COVALENT_KEYS', 'COVALENT_API_KEYS',
+                    # Individual key variants (both KEY and API_KEY styles)
+                    'COVALENT_KEY_1', 'COVALENT_KEY_2', 'COVALENT_KEY_3',
+                    'COVALENT_API_KEY_1', 'COVALENT_API_KEY_2', 'COVALENT_API_KEY_3'
+                ],
                 'fallback_keys': ['COVALENT_API_KEY']
             },
             'helius': {
-                'env_keys': ['HELIUS_KEYS', 'HELIUS_KEY_1', 'HELIUS_KEY_2', 'HELIUS_KEY_3'],
-                'fallback_keys': ['HELIUS_API_KEY']
+                'env_keys': ['HELIUS_KEYS', 'HELIUS_KEY_1', 'HELIUS_KEY_2', 'HELIUS_KEY_3', 'HELIUS_API_KEYS'],
+                'fallback_keys': ['HELIUS_API_KEY', 'SOLANA_HELIUS_API']
             },
             'etherscan': {
-                'env_keys': ['ETH_KEYS', 'ETH_KEY_1', 'ETH_KEY_2', 'ETH_KEY_3'],
+                'env_keys': ['ETH_KEYS', 'ETH_KEY_1', 'ETH_KEY_2', 'ETH_KEY_3', 'ETH_API_KEYS', 'ETH_API_KEY_1', 'ETH_API_KEY_2', 'ETH_API_KEY_3'],
                 'fallback_keys': ['ETHEREUM_API_KEY']
             },
             'bscscan': {
-                'env_keys': ['BSC_KEYS', 'BSC_KEY_1', 'BSC_KEY_2', 'BSC_KEY_3'],
+                'env_keys': ['BSC_KEYS', 'BSC_KEY_1', 'BSC_KEY_2', 'BSC_KEY_3', 'BSC_API_KEYS', 'BSC_API_KEY_1', 'BSC_API_KEY_2', 'BSC_API_KEY_3'],
                 'fallback_keys': ['BSC_API_KEY']
             },
             'goplus': {
@@ -57,7 +63,7 @@ class KeyRotationManager:
             }
         }
         self.load_keys()
-    
+
     def load_keys(self):
         """Load API keys from environment variables"""
         for service, config in self.service_configs.items():
@@ -105,7 +111,18 @@ class KeyRotationManager:
             if env_key.endswith('S'):  # Only check keys ending with 'S' for comma-separated
                 value = os.getenv(env_key)
                 if value:
-                    keys.extend([k.strip() for k in value.split(',') if k.strip()])
+                    for token in value.split(','):
+                        token = token.strip()
+                        if not token:
+                            continue
+                        # Accept formats like KEY, NAME=KEY, url?...api-key=KEY
+                        if 'api-key=' in token:
+                            token = token.split('api-key=')[-1]
+                        if '=' in token:
+                            token = token.split('=')[-1]
+                        token = token.strip().strip('"').strip("'")
+                        if token:
+                            keys.append(token)
         return keys
     
     def _get_individual_keys(self, env_keys: List[str]) -> List[str]:
@@ -115,7 +132,14 @@ class KeyRotationManager:
             if not env_key.endswith('S'):  # Only check keys NOT ending with 'S'
                 value = os.getenv(env_key)
                 if value and value.strip():
-                    keys.append(value.strip())
+                    token = value.strip()
+                    if 'api-key=' in token:
+                        token = token.split('api-key=')[-1]
+                    if '=' in token:
+                        token = token.split('=')[-1]
+                    token = token.strip().strip('"').strip("'")
+                    if token:
+                        keys.append(token)
         return keys
     
     def _get_fallback_keys(self, fallback_keys: List[str]) -> List[str]:
@@ -124,7 +148,14 @@ class KeyRotationManager:
         for env_key in fallback_keys:
             value = os.getenv(env_key)
             if value and value.strip():
-                keys.append(value.strip())
+                token = value.strip()
+                if 'api-key=' in token:
+                    token = token.split('api-key=')[-1]
+                if '=' in token:
+                    token = token.split('=')[-1]
+                token = token.strip().strip('"').strip("'")
+                if token:
+                    keys.append(token)
         return keys
     
     def _hash_key(self, key: str) -> str:
@@ -136,7 +167,7 @@ class KeyRotationManager:
         if service not in self.keys:
             logger.warning(f"Service {service} not configured")
             return None
-        
+
         available_keys = [k for k in self.keys[service] if k.is_active and k.cooldown_until < time.time()]
         
         if not available_keys:
@@ -209,7 +240,7 @@ class KeyRotationManager:
         """Reset cooldown for a specific key"""
         if service not in self.keys:
             return
-        
+
         for key_info in self.keys[service]:
             if key_info.key_hash == key_hash:
                 key_info.cooldown_until = 0

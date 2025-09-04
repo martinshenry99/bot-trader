@@ -69,7 +69,7 @@ class AddressFormatter:
             
         except Exception:
             return f"`{tx_hash[:12]}...`" if len(tx_hash) > 20 else f"`{tx_hash}`"
-
+    
 
 def format_wallet_analysis(analysis: Dict) -> Tuple[str, InlineKeyboardMarkup]:
     """Format wallet analysis results for Telegram"""

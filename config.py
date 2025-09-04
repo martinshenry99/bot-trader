@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load only the main .env file and allow override to ensure consistency
+load_dotenv(dotenv_path=os.path.join(os.getcwd(), '.env'), override=True)
 
 class Config:
     # Telegram - REQUIRED - No default value for security

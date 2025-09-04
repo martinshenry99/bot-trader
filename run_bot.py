@@ -4,6 +4,7 @@ Simple startup script for Meme Trader V4 Pro
 """
 
 import asyncio
+import platform
 import logging
 import sys
 import os
@@ -28,6 +29,12 @@ logger = logging.getLogger(__name__)
 def main():
     """Main startup function"""
     try:
+        # Ensure a compatible event loop on Windows
+        if platform.system() == "Windows":
+            try:
+                asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            except Exception:
+                pass
         logger.info("Starting Meme Trader V4 Pro...")
         
         # Import and validate config (allow running with warnings for missing optional APIs)
@@ -64,11 +71,7 @@ def main():
         # Start the bot
         logger.info("Starting Telegram bot...")
         from bot.commands import get_bot_commands
-        # get_bot_commands may be async, handle both cases
-        try:
-            commands = asyncio.run(get_bot_commands())
-        except RuntimeError:
-            commands = asyncio.get_event_loop().run_until_complete(get_bot_commands())
+        commands = get_bot_commands()
         
         # Import telegram components
         from telegram.ext import Application, CommandHandler, CallbackQueryHandler
@@ -85,7 +88,32 @@ def main():
         async def _start(update, context):
             await update.message.reply_text("Meme Trader V4 Pro online. Try /scan or /watchlist.")
         async def _help(update, context):
-            await update.message.reply_text("Commands: /scan, /watchlist, /analyze")
+            help_text = (
+                "Commands:\n"
+                "\n"
+                "- /start — Initialize the bot and show a quick intro\n"
+                "- /help — Show this help menu\n"
+                "\n"
+                "Discovery & Analysis:\n"
+                "- /scan — Discover high-performing trader wallets across chains\n"
+                "- /analyze <address> [chain] — Deep-dive wallet/token analysis\n"
+                "\n"
+                "Watchlist & Monitoring:\n"
+                "- /watchlist — Manage your watchlist (add/remove/list/rename)\n"
+                "\n"
+                "Trading & Portfolio:\n"
+                "- /portfolio — Show current tracked positions and PnL\n"
+                "- /panic_sell — Market-sell tracked tokens immediately (safety checks apply)\n"
+                "\n"
+                "Wallet & Security:\n"
+                "- /balance — Show balances for your configured wallets\n"
+                "- /address — Show your current executor wallet addresses\n"
+                "- /mnemonic — Keystore management options (import/export/create)\n"
+                "\n"
+                "Settings:\n"
+                "- /settings — View and change preferences (slippage, scoring thresholds, alerts)\n"
+            )
+            await update.message.reply_text(help_text)
         application.add_handler(CommandHandler("start", _start))
         application.add_handler(CommandHandler("help", _help))
         
@@ -98,7 +126,14 @@ def main():
         logger.info("Starting bot...")
         logger.info("Send /start to your bot to begin!")
         
-        # Start the bot
+        # Ensure a current event loop exists (Python 3.13 get_event_loop strictness)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Start the bot using PTB's built-in runner
         application.run_polling()
         
     except ImportError as e:

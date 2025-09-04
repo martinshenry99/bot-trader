@@ -1200,7 +1200,23 @@ Click buttons below to modify settings:
             elif data.startswith('view_portfolio_') or data.startswith('refresh_portfolio_'):
                 await self._handle_portfolio_view(query, user_id)
 
-            # Handle enhanced action callbacks
+            # Handle scan result callbacks (new format)
+            elif data.startswith('scan_a_'):
+                # Analyze wallet from scan results
+                index = int(data.split('_')[2])
+                await self._handle_scan_analyze_wallet(query, index, user_id)
+            elif data.startswith('scan_w_'):
+                # Add wallet to watchlist from scan results
+                index = int(data.split('_')[2])
+                await self._handle_scan_add_watchlist(query, index, user_id)
+            elif data.startswith('scan_c_'):
+                # Copy wallet address from scan results
+                index = int(data.split('_')[2])
+                await self._handle_scan_copy_address(query, index, user_id)
+            elif data == 'scan_next':
+                await self._handle_scan_next_page(query, user_id)
+            
+            # Handle enhanced action callbacks (legacy format)
             elif data.startswith('analyze_wallet_'):
                 wallet_prefix = data.replace('analyze_wallet_', '')
                 await self._handle_analyze_wallet_callback(query, wallet_prefix, user_id)
@@ -1819,6 +1835,111 @@ Need detailed help? Use /help command.
         except Exception as e:
             logger.error(f"Add watchlist callback error: {e}")
             await query.edit_message_text("❌ Error adding to watchlist")
+
+    async def _handle_scan_analyze_wallet(self, query, index, user_id):
+        """Handle analyze wallet callback from scan results"""
+        try:
+            # Get wallet data from bot context
+            wallets = query.bot.bot_data.get('last_scan_wallets', [])
+            if index >= len(wallets):
+                await query.edit_message_text("❌ Wallet not found. Please run `/scan` again.")
+                return
+            
+            wallet = wallets[index]
+            
+            await query.edit_message_text(
+                f"🔍 **Wallet Analysis**\n\n"
+                f"**Address:** `{wallet.address}`\n"
+                f"**Chain:** {wallet.chain.upper()}\n"
+                f"**Score:** {wallet.score:.1f}/100\n"
+                f"**Win Rate:** {wallet.win_rate:.1f}%\n"
+                f"**Max Multiplier:** {wallet.max_mult:.1f}x\n"
+                f"**Avg ROI:** {wallet.avg_roi:.1f}%\n"
+                f"**Volume:** ${wallet.volume_usd:,.0f}\n"
+                f"**Recent Activity:** {wallet.recent_activity} trades\n\n"
+                f"**Sample Token:** {wallet.sample_profitable_token}\n"
+                f"**Sample Multiplier:** {wallet.sample_multiplier:.1f}x\n\n"
+                f"*Use `/analyze {wallet.address} {wallet.chain}` for detailed analysis.*",
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Scan analyze wallet callback failed: {e}")
+            await query.edit_message_text("❌ Analysis failed. Please try again.")
+    
+    async def _handle_scan_add_watchlist(self, query, index, user_id):
+        """Handle add to watchlist callback from scan results"""
+        try:
+            # Get wallet data from bot context
+            wallets = query.bot.bot_data.get('last_scan_wallets', [])
+            if index >= len(wallets):
+                await query.edit_message_text("❌ Wallet not found. Please run `/scan` again.")
+                return
+            
+            wallet = wallets[index]
+            
+            # Add to watchlist using the database
+            from db.models import get_db_manager
+            db = get_db_manager()
+            success = db.add_wallet_to_watchlist(
+                address=wallet.address,
+                chain=wallet.chain,
+                user_id=int(user_id),
+                wallet_type='wallet',
+                label=f"Score: {wallet.score:.1f}"
+            )
+            
+            if success:
+                await query.edit_message_text(
+                    f"⭐ **Added to Watchlist**\n\n"
+                    f"**Address:** `{wallet.address}`\n"
+                    f"**Chain:** {wallet.chain.upper()}\n"
+                    f"**Score:** {wallet.score:.1f}/100\n"
+                    f"**Label:** Score: {wallet.score:.1f}\n\n"
+                    f"✅ You'll receive alerts when this wallet makes trades!",
+                    parse_mode='Markdown'
+                )
+            else:
+                await query.edit_message_text("❌ Failed to add to watchlist. Please try again.")
+        except Exception as e:
+            logger.error(f"Scan add watchlist callback failed: {e}")
+            await query.edit_message_text("❌ Failed to add to watchlist. Please try again.")
+    
+    async def _handle_scan_copy_address(self, query, index, user_id):
+        """Handle copy address callback from scan results"""
+        try:
+            # Get wallet data from bot context
+            wallets = query.bot.bot_data.get('last_scan_wallets', [])
+            if index >= len(wallets):
+                await query.edit_message_text("❌ Wallet not found. Please run `/scan` again.")
+                return
+            
+            wallet = wallets[index]
+            
+            await query.edit_message_text(
+                f"📋 **Copy Address**\n\n"
+                f"**Full Address:**\n"
+                f"`{wallet.address}`\n\n"
+                f"**Chain:** {wallet.chain.upper()}\n"
+                f"**Score:** {wallet.score:.1f}/100\n\n"
+                f"*Tap the address above to copy it to your clipboard.*",
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Scan copy address callback failed: {e}")
+            await query.edit_message_text("❌ Failed to copy address. Please try again.")
+    
+    async def _handle_scan_next_page(self, query, user_id):
+        """Handle scan next page callback"""
+        try:
+            await query.edit_message_text(
+                "📄 **Next Page**\n\n"
+                "⚠️ Pagination not yet implemented.\n"
+                "Run `/scan` again to see more results.",
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Scan next page callback failed: {e}")
+            await query.edit_message_text("❌ Failed to load next page. Please try again.")
 
     async def _handle_blacklist_wallet_callback(self, query, wallet_prefix: str, user_id: str):
         """Handle blacklist wallet callback"""

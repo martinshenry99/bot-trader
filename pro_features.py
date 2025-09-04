@@ -44,7 +44,7 @@ class ProFeaturesManager:
     
     async def get_pro_features_status(self) -> Dict[str, Any]:
         """Get status of all pro features"""
-        return {
+                return {
             'features': self.features_enabled,
             'subscription_active': True,
             'ai_available': False,

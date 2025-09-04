@@ -58,9 +58,11 @@ async def initialize_integrations():
         else:
             logger.warning("GoPlus API key not found")
         
-        # Initialize Covalent client
-        if Config.COVALENT_API_KEY:
-            covalent_client = CovalentClient(Config.COVALENT_API_KEY)
+        # Initialize Covalent client via key rotation manager
+        from utils.key_manager import get_api_key
+        covalent_key = get_api_key('covalent')
+        if covalent_key:
+            covalent_client = CovalentClient(covalent_key)
             integration_manager.register_client('covalent', covalent_client)
             logger.info("Covalent client initialized")
         else:
@@ -89,48 +91,48 @@ async def initialize_integrations():
         return True
         
     except Exception as e:
-        logger.error(f"❌ Failed to initialize integrations: {e}")
+        logger.error(f"Failed to initialize integrations: {e}")
         return False
 
 
 async def startup_sequence():
     """Complete startup sequence"""
     try:
-        logger.info("🚀 Starting Meme Trader V4 Pro...")
+        logger.info("Starting Meme Trader V4 Pro...")
         
         # Initialize integrations
         integration_success = await initialize_integrations()
         
         if not integration_success:
-            logger.error("❌ Critical: Integration initialization failed")
+            logger.error("Critical: Integration initialization failed")
             return False
         
         # Initialize trading engine
         from core.trading_engine import trading_engine
-        logger.info("✅ Trading engine initialized")
+        logger.info("Trading engine initialized")
         
         # Log configuration summary
-        logger.info("📋 Configuration Summary:")
-        logger.info(f"  • Ethereum RPC: {Config.ETHEREUM_RPC_URL[:50]}...")
-        logger.info(f"  • BSC RPC: {Config.BSC_RPC_URL[:50]}...")
-        logger.info(f"  • Solana RPC: {Config.SOLANA_RPC_URL[:50]}...")
-        logger.info(f"  • Jupiter API: {Config.JUPITER_API_URL}")
-        logger.info(f"  • Trading enabled on: ETH (Chain {Config.CHAIN_ID}), BSC (Chain {Config.BSC_CHAIN_ID}), Solana")
+        logger.info("Configuration Summary:")
+        logger.info(f"  - Ethereum RPC: {Config.ETHEREUM_RPC_URL[:50]}...")
+        logger.info(f"  - BSC RPC: {Config.BSC_RPC_URL[:50]}...")
+        logger.info(f"  - Solana RPC: {Config.SOLANA_RPC_URL[:50]}...")
+        logger.info(f"  - Jupiter API: {Config.JUPITER_API_URL}")
+        logger.info(f"  - Trading enabled on: ETH (Chain {Config.CHAIN_ID}), BSC (Chain {Config.BSC_CHAIN_ID}), Solana")
         
         # Trading engine configuration
         config = trading_engine.config
-        logger.info("⚙️ Trading Engine Configuration:")
-        logger.info(f"  • Safe Mode: {'ON' if config['safe_mode'] else 'OFF'}")
-        logger.info(f"  • Mirror Sell: {'ON' if config['mirror_sell_enabled'] else 'OFF'}")
-        logger.info(f"  • Mirror Buy: {'ON' if config['mirror_buy_enabled'] else 'OFF'}")
-        logger.info(f"  • Max Auto Buy: ${config['max_auto_buy_usd']}")
-        logger.info(f"  • Max Slippage: {config['max_slippage']*100:.1f}%")
+        logger.info("Trading Engine Configuration:")
+        logger.info(f"  - Safe Mode: {'ON' if config['safe_mode'] else 'OFF'}")
+        logger.info(f"  - Mirror Sell: {'ON' if config['mirror_sell_enabled'] else 'OFF'}")
+        logger.info(f"  - Mirror Buy: {'ON' if config['mirror_buy_enabled'] else 'OFF'}")
+        logger.info(f"  - Max Auto Buy: ${config['max_auto_buy_usd']}")
+        logger.info(f"  - Max Slippage: {config['max_slippage']*100:.1f}%")
         
-        logger.info("🎯 All systems initialized successfully!")
+        logger.info("All systems initialized successfully!")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Startup sequence failed: {e}")
+        logger.error(f"Startup sequence failed: {e}")
         return False
 
 
@@ -148,7 +150,7 @@ if __name__ == "__main__":
     
     success = run_startup()
     if success:
-        print("✅ Startup completed successfully!")
+        print("Startup completed successfully!")
     else:
-        print("❌ Startup failed!")
+        print("Startup failed!")
         exit(1)

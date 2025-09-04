@@ -50,6 +50,9 @@ class BotCommands:
             # Format results exactly as specified
             message = self._format_scan_results(discovered_wallets)
             
+            # Store wallet data in bot context for callback handlers
+            context.bot_data['last_scan_wallets'] = discovered_wallets
+            
             # Create inline keyboard with action buttons
             keyboard = self._create_scan_keyboard(discovered_wallets)
             
@@ -107,20 +110,23 @@ class BotCommands:
         """Create inline keyboard for scan results"""
         keyboard = []
         
-        for wallet in wallets:
+        for i, wallet in enumerate(wallets):
+            # Use wallet index as callback data (much shorter)
+            # Store full wallet data in bot context for retrieval
+            
             # Row for each wallet with action buttons
             row = [
                 InlineKeyboardButton(
-                    "🔍 Analyze Wallet", 
-                    callback_data=f"analyze_wallet_{wallet.address}_{wallet.chain}"
+                    "🔍 Analyze", 
+                    callback_data=f"scan_a_{i}"
                 ),
                 InlineKeyboardButton(
-                    "⭐ Add to Watchlist", 
-                    callback_data=f"add_watchlist_{wallet.address}_{wallet.chain}"
+                    "⭐ Add", 
+                    callback_data=f"scan_w_{i}"
                 ),
                 InlineKeyboardButton(
-                    "📋 Copy Address", 
-                    callback_data=f"copy_address_{wallet.address}"
+                    "📋 Copy", 
+                    callback_data=f"scan_c_{i}"
                 )
             ]
             keyboard.append(row)
@@ -128,7 +134,7 @@ class BotCommands:
         # Add pagination if more results available
         if len(wallets) >= 10:
             keyboard.append([
-                InlineKeyboardButton("Next Page", callback_data="scan_next_page")
+                InlineKeyboardButton("Next Page", callback_data="scan_next")
             ])
         
         return InlineKeyboardMarkup(keyboard)
@@ -422,6 +428,6 @@ class BotCommands:
 # Global commands instance
 bot_commands = BotCommands()
 
-async def get_bot_commands() -> BotCommands:
+def get_bot_commands() -> BotCommands:
     """Get bot commands instance"""
-    return bot_commands 
+    return bot_commands
