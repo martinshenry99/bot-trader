@@ -47221,3 +47221,322 @@ telegram.error.NetworkError: httpx.ConnectError: [Errno 11002] getaddrinfo faile
 2025-09-04 01:41:20,336 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
 2025-09-04 01:41:31,224 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
 2025-09-04 01:41:42,090 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:42:12,427 - __main__ - INFO - Starting Meme Trader V4 Pro...
+2025-09-04 01:42:12,489 - __main__ - WARNING - Covalent keys not configured – discovery/analysis features will be limited
+2025-09-04 01:42:12,490 - __main__ - INFO - Configuration validated (with possible warnings)
+2025-09-04 01:42:12,492 - __main__ - INFO - Initializing database...
+2025-09-04 01:42:12,572 - db.models - INFO - Database initialized successfully
+2025-09-04 01:42:12,582 - db.models - INFO - Database initialized successfully
+2025-09-04 01:42:12,583 - __main__ - INFO - Database initialized
+2025-09-04 01:42:12,584 - __main__ - INFO - Initializing API integrations...
+2025-09-04 01:42:13,727 - utils.key_manager - INFO - Loaded 1 covalent keys from individual format
+2025-09-04 01:42:13,729 - utils.key_manager - INFO - Total covalent keys loaded: 1
+2025-09-04 01:42:13,731 - utils.key_manager - INFO - Loaded 1 helius keys from fallback format
+2025-09-04 01:42:13,733 - utils.key_manager - INFO - Total helius keys loaded: 1
+2025-09-04 01:42:13,734 - utils.key_manager - INFO - Loaded 3 etherscan keys from individual format
+2025-09-04 01:42:13,735 - utils.key_manager - INFO - Total etherscan keys loaded: 3
+2025-09-04 01:42:13,735 - utils.key_manager - INFO - Loaded 3 bscscan keys from individual format
+2025-09-04 01:42:13,736 - utils.key_manager - INFO - Total bscscan keys loaded: 3
+2025-09-04 01:42:13,737 - utils.key_manager - INFO - Loaded 1 goplus keys from fallback format
+2025-09-04 01:42:13,738 - utils.key_manager - INFO - Total goplus keys loaded: 1
+2025-09-04 01:42:13,739 - utils.key_manager - INFO - Loaded 1 coingecko keys from fallback format
+2025-09-04 01:42:13,741 - utils.key_manager - INFO - Total coingecko keys loaded: 1
+2025-09-04 01:42:13,760 - startup - INFO - Initializing API integrations...
+2025-09-04 01:42:13,761 - startup - INFO - 0x Protocol clients initialized
+2025-09-04 01:42:13,762 - startup - INFO - Jupiter client initialized
+2025-09-04 01:42:13,763 - startup - INFO - CoinGecko client initialized
+2025-09-04 01:42:13,764 - startup - INFO - GoPlus client initialized
+2025-09-04 01:42:13,765 - startup - INFO - Covalent client initialized
+2025-09-04 01:42:13,767 - startup - INFO - Running health checks...
+2025-09-04 01:42:16,126 - integrations.base - ERROR - API error 404: {
+  "message":"no Route matched with those values",
+  "request_id":"e6d4f072a0c684397352fe289393205f"
+}
+2025-09-04 01:42:18,471 - integrations.base - ERROR - API error 404: {
+  "message":"no Route matched with those values",
+  "request_id":"235ca13d1b917235e782a647f71c361f"
+}
+2025-09-04 01:42:18,994 - integrations.base - ERROR - API error 404: {
+  "message":"no Route matched with those values",
+  "request_id":"87357738803bcd2bdbcbdf206c985b25"
+}
+2025-09-04 01:42:20,740 - integrations.base - ERROR - API error 404: 
+2025-09-04 01:42:28,067 - integrations.base - ERROR - API error 403: <!DOCTYPE html>
+<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+<head>
+<title>Attention Required! | Cloudflare</title>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+<!--[if lt IE 9]><link rel="stylesheet" id='cf_styles-ie-css' href="/cdn-cgi/styles/cf.errors.ie.css" /><![endif]-->
+<style>body{margin:0;padding:0}</style>
+
+
+<!--[if gte IE 10]><!-->
+<script>
+  if (!navigator.cookieEnabled) {
+    window.addEventListener('DOMContentLoaded', function () {
+      var cookieEl = document.getElementById('cookie-alert');
+      cookieEl.style.display = 'block';
+    })
+  }
+</script>
+<!--<![endif]-->
+
+</head>
+<body>
+  <div id="cf-wrapper">
+    <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+    <div id="cf-error-details" class="cf-error-details-wrapper">
+      <div class="cf-wrapper cf-header cf-error-overview">
+        <h1 data-translate="block_headline">Sorry, you have been blocked</h1>
+        <h2 class="cf-subheadline"><span data-translate="unable_to_access">You are unable to access</span> covalenthq.com</h2>
+      </div><!-- /.header -->
+
+      <div class="cf-section cf-highlight">
+        <div class="cf-wrapper">
+          <div class="cf-screenshot-container cf-screenshot-full">
+            
+              <span class="cf-no-screenshot error"></span>
+            
+          </div>
+        </div>
+      </div><!-- /.captcha-container -->
+
+      <div class="cf-section cf-wrapper">
+        <div class="cf-columns two">
+          <div class="cf-column">
+            <h2 data-translate="blocked_why_headline">Why have I been blocked?</h2>
+
+            <p data-translate="blocked_why_detail">This website is using a security service to protect itself from online attacks. The action you just performed triggered the security solution. There are several actions that could trigger this block including submitting a certain word or phrase, a SQL command or malformed data.</p>
+          </div>
+
+          <div class="cf-column">
+            <h2 data-translate="blocked_resolve_headline">What can I do to resolve this?</h2>
+
+            <p data-translate="blocked_resolve_detail">You can email the site owner to let them know you were blocked. Please include what you were doing when this page came up and the Cloudflare Ray ID found at the bottom of this page.</p>
+          </div>
+        </div>
+      </div><!-- /.section -->
+
+      <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+    <p class="text-13">
+      <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">97997270ea48d486</strong></span>
+      <span class="cf-footer-separator sm:hidden">&bull;</span>
+      <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+        Your IP:
+        <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+        <span class="hidden" id="cf-footer-ip">138.199.21.202</span>
+        <span class="cf-footer-separator sm:hidden">&bull;</span>
+      </span>
+      <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+      
+    </p>
+    <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+  </div><!-- /.error-footer -->
+
+    </div><!-- /#cf-error-details -->
+  </div><!-- /#cf-wrapper -->
+
+  <script>
+    window._cf_translation = {};
+    
+    
+  </script>
+</body>
+</html>
+2025-09-04 01:42:28,086 - startup - INFO - Health check results: 2/7 clients healthy
+2025-09-04 01:42:28,088 - startup - INFO -   - zerox_eth: UNHEALTHY
+2025-09-04 01:42:28,089 - startup - INFO -   - zerox_bsc: UNHEALTHY
+2025-09-04 01:42:28,090 - startup - INFO -   - zerox: UNHEALTHY
+2025-09-04 01:42:28,091 - startup - INFO -   - jupiter: UNHEALTHY
+2025-09-04 01:42:28,092 - startup - INFO -   - coingecko: HEALTHY
+2025-09-04 01:42:28,093 - startup - INFO -   - goplus: HEALTHY
+2025-09-04 01:42:28,094 - startup - INFO -   - covalent: UNHEALTHY
+2025-09-04 01:42:28,095 - startup - WARNING - 5 clients are unhealthy. Some features may be limited.
+2025-09-04 01:42:28,097 - startup - INFO - Integration initialization completed successfully.
+2025-09-04 01:42:28,102 - __main__ - INFO - Starting Telegram bot...
+2025-09-04 01:42:31,560 - __main__ - INFO - Bot handlers configured
+2025-09-04 01:42:31,561 - __main__ - INFO - Starting bot...
+2025-09-04 01:42:31,562 - __main__ - INFO - Send /start to your bot to begin!
+2025-09-04 01:42:34,591 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getMe "HTTP/1.1 200 OK"
+2025-09-04 01:42:35,211 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/deleteWebhook "HTTP/1.1 200 OK"
+2025-09-04 01:42:35,217 - telegram.ext.Application - INFO - Application started
+2025-09-04 01:42:47,679 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:42:58,551 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:43:09,164 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:43:20,019 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:43:30,874 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:43:41,735 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:43:52,641 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:44:03,652 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:44:14,509 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:44:25,363 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:44:35,977 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:44:46,834 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:44:57,684 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:45:08,308 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:45:19,158 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:45:30,019 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:45:40,863 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:45:51,711 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:46:02,573 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:46:13,429 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:46:24,038 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:46:34,880 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:46:45,501 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:46:56,368 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:47:07,223 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:47:18,077 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:47:28,944 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:47:34,992 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:47:37,947 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:47:44,347 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:47:47,133 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/sendMessage "HTTP/1.1 200 OK"
+2025-09-04 01:47:47,138 - monitor.scanner - INFO - Starting discovery scan for top 10 wallets (min score: 70)
+2025-09-04 01:47:49,387 - services.covalent - ERROR - Covalent request blocked by Cloudflare (HTTP 403). Consider using residential IP or proxy.
+2025-09-04 01:47:49,389 - utils.key_manager - WARNING - Key cqt_rQRk... for covalent marked cooldown for 300s
+2025-09-04 01:47:50,420 - utils.key_manager - WARNING - No available keys for covalent - all keys in cooldown
+2025-09-04 01:47:50,422 - services.covalent - ERROR - No available Covalent API keys
+2025-09-04 01:47:50,424 - monitor.scanner - INFO - Added 0 transactions from ethereum
+2025-09-04 01:47:50,426 - monitor.scanner - INFO - Covalent keys not available, using mock data for bsc
+2025-09-04 01:47:50,457 - services.mock_data - INFO - Generated 500 mock transactions for chain 56
+2025-09-04 01:47:50,459 - monitor.scanner - INFO - Added 500 mock transactions from bsc
+2025-09-04 01:47:50,460 - services.helius - INFO - Helius get_recent_transactions called (stub)
+2025-09-04 01:47:50,461 - monitor.scanner - INFO - Added 0 Solana transactions
+2025-09-04 01:47:50,480 - monitor.scanner - INFO - Added 8 cached high performers
+2025-09-04 01:47:50,482 - monitor.scanner - INFO - Total unique candidates: 15
+2025-09-04 01:47:50,484 - monitor.scanner - INFO - Found 15 candidate wallets
+2025-09-04 01:47:50,486 - monitor.scanner - INFO - Processing 15 candidates in batch
+2025-09-04 01:47:50,488 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6
+2025-09-04 01:47:50,489 - services.mock_data - INFO - Generated mock metrics for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6: score=87, win_rate=82%
+2025-09-04 01:47:50,491 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6
+2025-09-04 01:47:50,494 - services.mock_data - INFO - Generated 30 mock transactions for wallet 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6
+2025-09-04 01:47:50,495 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x1234567890123456789012345678901234567890
+2025-09-04 01:47:50,499 - services.mock_data - INFO - Generated mock metrics for 0x1234567890123456789012345678901234567890: score=79, win_rate=89%
+2025-09-04 01:47:50,501 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x1234567890123456789012345678901234567890
+2025-09-04 01:47:50,509 - services.mock_data - INFO - Generated 49 mock transactions for wallet 0x1234567890123456789012345678901234567890
+2025-09-04 01:47:50,512 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x9876543210987654321098765432109876543210
+2025-09-04 01:47:50,516 - services.mock_data - INFO - Generated mock metrics for 0x9876543210987654321098765432109876543210: score=80, win_rate=60%
+2025-09-04 01:47:50,517 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x9876543210987654321098765432109876543210
+2025-09-04 01:47:50,524 - services.mock_data - INFO - Generated 62 mock transactions for wallet 0x9876543210987654321098765432109876543210
+2025-09-04 01:47:50,526 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x8ba1f109551bD432803012645Hac136c22C501e3
+2025-09-04 01:47:50,531 - services.mock_data - INFO - Generated mock metrics for 0x8ba1f109551bD432803012645Hac136c22C501e3: score=84, win_rate=64%
+2025-09-04 01:47:50,533 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x8ba1f109551bD432803012645Hac136c22C501e3
+2025-09-04 01:47:50,551 - services.mock_data - INFO - Generated 73 mock transactions for wallet 0x8ba1f109551bD432803012645Hac136c22C501e3
+2025-09-04 01:47:50,555 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x2222222222222222222222222222222222222222
+2025-09-04 01:47:50,558 - services.mock_data - INFO - Generated mock metrics for 0x2222222222222222222222222222222222222222: score=77, win_rate=87%
+2025-09-04 01:47:50,561 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x2222222222222222222222222222222222222222
+2025-09-04 01:47:50,566 - services.mock_data - INFO - Generated 63 mock transactions for wallet 0x2222222222222222222222222222222222222222
+2025-09-04 01:47:50,568 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x8ba1f109551bD432803012645Hac136c22C501e3
+2025-09-04 01:47:50,571 - services.mock_data - INFO - Generated mock metrics for 0x8ba1f109551bD432803012645Hac136c22C501e3: score=84, win_rate=64%
+2025-09-04 01:47:50,573 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x8ba1f109551bD432803012645Hac136c22C501e3
+2025-09-04 01:47:50,579 - services.mock_data - INFO - Generated 39 mock transactions for wallet 0x8ba1f109551bD432803012645Hac136c22C501e3
+2025-09-04 01:47:50,581 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x9876543210987654321098765432109876543210
+2025-09-04 01:47:50,584 - services.mock_data - INFO - Generated mock metrics for 0x9876543210987654321098765432109876543210: score=80, win_rate=60%
+2025-09-04 01:47:50,585 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x9876543210987654321098765432109876543210
+2025-09-04 01:47:50,594 - services.mock_data - INFO - Generated 95 mock transactions for wallet 0x9876543210987654321098765432109876543210
+2025-09-04 01:47:50,596 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6
+2025-09-04 01:47:50,599 - services.mock_data - INFO - Generated mock metrics for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6: score=87, win_rate=82%
+2025-09-04 01:47:50,601 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6
+2025-09-04 01:47:50,612 - services.mock_data - INFO - Generated 68 mock transactions for wallet 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6
+2025-09-04 01:47:50,615 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x3333333333333333333333333333333333333333
+2025-09-04 01:47:50,618 - services.mock_data - INFO - Generated mock metrics for 0x3333333333333333333333333333333333333333: score=57, win_rate=67%
+2025-09-04 01:47:50,621 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x3333333333333333333333333333333333333333
+2025-09-04 01:47:50,633 - services.mock_data - INFO - Generated 69 mock transactions for wallet 0x3333333333333333333333333333333333333333
+2025-09-04 01:47:50,637 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b
+2025-09-04 01:47:50,641 - services.mock_data - INFO - Generated mock metrics for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b: score=69, win_rate=79%
+2025-09-04 01:47:50,643 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b
+2025-09-04 01:47:50,651 - services.mock_data - INFO - Generated 42 mock transactions for wallet 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b
+2025-09-04 01:47:50,655 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b
+2025-09-04 01:47:50,656 - services.mock_data - INFO - Generated mock metrics for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b: score=69, win_rate=79%
+2025-09-04 01:47:50,659 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b
+2025-09-04 01:47:50,671 - services.mock_data - INFO - Generated 94 mock transactions for wallet 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b
+2025-09-04 01:47:50,672 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x1234567890123456789012345678901234567890
+2025-09-04 01:47:50,672 - services.mock_data - INFO - Generated mock metrics for 0x1234567890123456789012345678901234567890: score=79, win_rate=89%
+2025-09-04 01:47:50,674 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x1234567890123456789012345678901234567890
+2025-09-04 01:47:50,678 - services.mock_data - INFO - Generated 85 mock transactions for wallet 0x1234567890123456789012345678901234567890
+2025-09-04 01:47:50,679 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0xfedcba0987654321fedcba0987654321fedcba09
+2025-09-04 01:47:50,681 - services.mock_data - INFO - Generated mock metrics for 0xfedcba0987654321fedcba0987654321fedcba09: score=86, win_rate=81%
+2025-09-04 01:47:50,682 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0xfedcba0987654321fedcba0987654321fedcba09
+2025-09-04 01:47:50,687 - services.mock_data - INFO - Generated 24 mock transactions for wallet 0xfedcba0987654321fedcba0987654321fedcba09
+2025-09-04 01:47:50,688 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0x1111111111111111111111111111111111111111
+2025-09-04 01:47:50,689 - services.mock_data - INFO - Generated mock metrics for 0x1111111111111111111111111111111111111111: score=87, win_rate=67%
+2025-09-04 01:47:50,689 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0x1111111111111111111111111111111111111111
+2025-09-04 01:47:50,694 - services.mock_data - INFO - Generated 97 mock transactions for wallet 0x1111111111111111111111111111111111111111
+2025-09-04 01:47:50,695 - monitor.scanner - INFO - Covalent keys not available, using mock metrics for 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd
+2025-09-04 01:47:50,696 - services.mock_data - INFO - Generated mock metrics for 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd: score=94, win_rate=89%
+2025-09-04 01:47:50,697 - monitor.scanner - INFO - Covalent keys not available, using mock token data for 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd
+2025-09-04 01:47:50,702 - services.mock_data - INFO - Generated 59 mock transactions for wallet 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd
+2025-09-04 01:47:50,704 - monitor.scanner - INFO - Successfully analyzed 15 wallets
+2025-09-04 01:47:50,705 - services.go_plus - INFO - GoPlus security check called for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6 on bsc (stub)
+2025-09-04 01:47:50,706 - services.go_plus - INFO - GoPlus security check called for 0x1234567890123456789012345678901234567890 on ethereum (stub)
+2025-09-04 01:47:50,707 - services.go_plus - INFO - GoPlus security check called for 0x9876543210987654321098765432109876543210 on bsc (stub)
+2025-09-04 01:47:50,707 - services.go_plus - INFO - GoPlus security check called for 0x8ba1f109551bD432803012645Hac136c22C501e3 on bsc (stub)
+2025-09-04 01:47:50,708 - services.go_plus - INFO - GoPlus security check called for 0x2222222222222222222222222222222222222222 on bsc (stub)
+2025-09-04 01:47:50,709 - services.go_plus - INFO - GoPlus security check called for 0x8ba1f109551bD432803012645Hac136c22C501e3 on ethereum (stub)
+2025-09-04 01:47:50,710 - services.go_plus - INFO - GoPlus security check called for 0x9876543210987654321098765432109876543210 on ethereum (stub)
+2025-09-04 01:47:50,710 - services.go_plus - INFO - GoPlus security check called for 0xA0b86a4c3C6D3a6e1D8A6eC0b5E2C8a7d3C1E7B6 on ethereum (stub)
+2025-09-04 01:47:50,711 - services.go_plus - INFO - GoPlus security check called for 0x3333333333333333333333333333333333333333 on bsc (stub)
+2025-09-04 01:47:50,712 - services.go_plus - INFO - GoPlus security check called for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b on bsc (stub)
+2025-09-04 01:47:50,713 - services.go_plus - INFO - GoPlus security check called for 0x742d35Cc6aD5C87B7c2d3fa7f5C95Ab3cde74d6b on ethereum (stub)
+2025-09-04 01:47:50,713 - services.go_plus - INFO - GoPlus security check called for 0x1234567890123456789012345678901234567890 on bsc (stub)
+2025-09-04 01:47:50,714 - services.go_plus - INFO - GoPlus security check called for 0xfedcba0987654321fedcba0987654321fedcba09 on bsc (stub)
+2025-09-04 01:47:50,714 - services.go_plus - INFO - GoPlus security check called for 0x1111111111111111111111111111111111111111 on bsc (stub)
+2025-09-04 01:47:50,715 - services.go_plus - INFO - GoPlus security check called for 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd on bsc (stub)
+2025-09-04 01:47:50,716 - monitor.scanner - INFO - Security checks completed: 15/15 wallets passed
+2025-09-04 01:47:50,717 - monitor.scanner - INFO - Security checks passed: 15 wallets
+2025-09-04 01:47:50,718 - monitor.scanner - INFO - Graph analysis completed: 15 wallets
+2025-09-04 01:47:50,718 - monitor.scanner - INFO - Qualified wallets (score >= 70): 12
+2025-09-04 01:47:50,832 - monitor.scanner - INFO - Saved 10 discovered wallets to database
+2025-09-04 01:47:50,833 - monitor.scanner - INFO - Discovery scan completed in 3.69s. Found 10 qualified wallets
+2025-09-04 01:47:52,092 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/sendMessage "HTTP/1.1 200 OK"
+2025-09-04 01:47:52,099 - bot.commands - INFO - Scan completed for user 6390848027: 10 wallets found
+2025-09-04 01:47:54,968 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:00,437 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:03,081 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:48:05,918 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:06,565 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:48:08,356 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:09,308 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:48:12,542 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:13,491 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:48:16,330 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:16,983 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:48:26,952 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:27,885 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:30,501 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-09-04 01:48:38,500 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:49,119 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:48:59,984 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:49:10,595 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:49:21,451 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:49:32,305 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:49:43,155 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:49:53,766 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:50:04,772 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:50:15,380 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:50:26,230 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:50:37,089 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:50:47,700 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:50:58,316 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:51:09,175 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:51:19,792 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:51:30,649 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:51:41,251 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:51:52,104 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:52:02,976 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:52:13,597 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:52:24,444 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:52:35,333 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:52:46,254 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:52:57,120 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:53:08,158 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:53:19,063 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
+2025-09-04 01:53:29,957 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8300046520:AAE6wdXTyK0w_-moczD33zSxjYkNsyp2cyY/getUpdates "HTTP/1.1 200 OK"
