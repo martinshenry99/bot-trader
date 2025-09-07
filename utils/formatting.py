@@ -25,7 +25,7 @@ class AddressFormatter:
     def format_wallet_address(cls, address: str, chain: str = 'ethereum', name: str = None) -> str:
         """Format wallet address with block explorer link"""
         try:
-                display_addr = f"{address[:6]}...{address[-4:]}" if len(address) > 20 else address
+            display_addr = f"{address[:6]}...{address[-4:]}" if len(address) > 20 else address
             explorer_base = cls.BLOCK_EXPLORERS.get(chain.lower(), cls.BLOCK_EXPLORERS['ethereum'])
             
             if chain.lower() == 'solana':
@@ -45,9 +45,9 @@ class AddressFormatter:
     def format_token_address(cls, address: str, chain: str = 'ethereum', symbol: str = None) -> str:
         """Format token contract address with block explorer link"""
         try:
-                display_addr = f"{address[:6]}...{address[-4:]}" if len(address) > 20 else address
+            display_addr = f"{address[:6]}...{address[-4:]}" if len(address) > 20 else address
             explorer_base = cls.BLOCK_EXPLORERS.get(chain.lower(), cls.BLOCK_EXPLORERS['ethereum'])
-                explorer_url = f"{explorer_base}/token/{address}"
+            explorer_url = f"{explorer_base}/token/{address}"
             
             if symbol:
                 return f"[{symbol} ({display_addr})]({explorer_url})"
@@ -63,7 +63,7 @@ class AddressFormatter:
         try:
             display_hash = f"{tx_hash[:8]}...{tx_hash[-6:]}" if len(tx_hash) > 20 else tx_hash
             explorer_base = cls.BLOCK_EXPLORERS.get(chain.lower(), cls.BLOCK_EXPLORERS['ethereum'])
-                explorer_url = f"{explorer_base}/tx/{tx_hash}"
+            explorer_url = f"{explorer_base}/tx/{tx_hash}"
             
             return f"[{display_hash}]({explorer_url})"
             

@@ -163,7 +163,15 @@ class KeyRotationManager:
         return hashlib.sha256(key.encode()).hexdigest()[:16]
     
     def get_key(self, service: str) -> Optional[str]:
-        """Get next available key for service"""
+        """Get next available key for service (returns key string only)."""
+        result = self.get_key_with_index(service)
+        if result is None:
+            return None
+        key, _index = result
+        return key
+
+    def get_key_with_index(self, service: str) -> Optional[Tuple[str, int]]:
+        """Get next available key for service and its index for logging/rotation."""
         if service not in self.keys:
             logger.warning(f"Service {service} not configured")
             return None
@@ -179,17 +187,18 @@ class KeyRotationManager:
         
         # Get the least used key
         selected_key = available_keys[0]
+        selected_index = self.keys[service].index(selected_key)
         
         # Update usage
         selected_key.last_used = int(time.time())
         selected_key.usage_count += 1
         
-        logger.debug(f"Selected {service} key: {selected_key.key[:8]}... (usage: {selected_key.usage_count})")
-        return selected_key.key
+        logger.debug(f"service:{service} key[{selected_index}] usage:{selected_key.usage_count}")
+        return selected_key.key, selected_index
     
     def mark_key_cooldown(self, service: str, key: str, cooldown_seconds: int = 300):
         """Mark key as in cooldown (rate limited)"""
-            if service not in self.keys:
+        if service not in self.keys:
             return
         
         key_hash = self._hash_key(key)
@@ -239,7 +248,7 @@ class KeyRotationManager:
     def reset_key_cooldown(self, service: str, key_hash: str):
         """Reset cooldown for a specific key"""
         if service not in self.keys:
-                    return
+            return
 
         for key_info in self.keys[service]:
             if key_info.key_hash == key_hash:
