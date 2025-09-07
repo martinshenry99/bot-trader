@@ -189,7 +189,7 @@ class KeyRotationManager:
     
     def mark_key_cooldown(self, service: str, key: str, cooldown_seconds: int = 300):
         """Mark key as in cooldown (rate limited)"""
-        if service not in self.keys:
+            if service not in self.keys:
             return
         
         key_hash = self._hash_key(key)
@@ -239,7 +239,7 @@ class KeyRotationManager:
     def reset_key_cooldown(self, service: str, key_hash: str):
         """Reset cooldown for a specific key"""
         if service not in self.keys:
-            return
+                    return
 
         for key_info in self.keys[service]:
             if key_info.key_hash == key_hash:

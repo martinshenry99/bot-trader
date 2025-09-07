@@ -64,6 +64,30 @@ class ExecutorData:
     keystore_path: str
     created_at: int
 
+@dataclass
+class TradeAlertData:
+    """Trade alert data structure"""
+    id: int
+    user_id: str
+    wallet_address: str
+    wallet_label: str
+    chain: str
+    action: str  # BUY or SELL
+    token_address: str
+    token_name: str
+    token_symbol: str
+    amount_tokens: float
+    amount_usd: float
+    tx_hash: str
+    timestamp: datetime
+    trader_win_rate: float
+    trader_roi: float
+    trader_trades_30d: int
+    risk_score: int
+    is_safe: bool
+    consensus_boost: bool
+    created_at: datetime
+
 class DatabaseManager:
     """Database manager for Meme Trader V4 Pro"""
     
@@ -161,6 +185,30 @@ class DatabaseManager:
                         usage_count INTEGER DEFAULT 0,
                         cooldown_until INTEGER DEFAULT 0,
                         PRIMARY KEY (service, key_hash)
+                    );
+                    
+                    -- Trade alerts table for instant notifications
+                    CREATE TABLE IF NOT EXISTS trade_alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        wallet_address TEXT NOT NULL,
+                        wallet_label TEXT NOT NULL,
+                        chain TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        token_address TEXT NOT NULL,
+                        token_name TEXT NOT NULL,
+                        token_symbol TEXT NOT NULL,
+                        amount_tokens REAL NOT NULL,
+                        amount_usd REAL NOT NULL,
+                        tx_hash TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        trader_win_rate REAL NOT NULL,
+                        trader_roi REAL NOT NULL,
+                        trader_trades_30d INTEGER NOT NULL,
+                        risk_score INTEGER NOT NULL,
+                        is_safe BOOLEAN NOT NULL,
+                        consensus_boost BOOLEAN DEFAULT 0,
+                        created_at TEXT NOT NULL
                     );
                     
                     -- Create indexes for performance
@@ -416,6 +464,98 @@ class DatabaseManager:
                 return [WalletData(*row) for row in rows]
         except Exception as e:
             logger.error(f"Failed to get wallet metrics by score: {e}")
+            return []
+    
+    def store_trade_alert(self, alert: 'TradeAlertData') -> bool:
+        """Store trade alert in database"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO trade_alerts 
+                    (user_id, wallet_address, wallet_label, chain, action, token_address, 
+                     token_name, token_symbol, amount_tokens, amount_usd, tx_hash, timestamp,
+                     trader_win_rate, trader_roi, trader_trades_30d, risk_score, is_safe, 
+                     consensus_boost, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    alert.user_id, alert.wallet_address, alert.wallet_label, alert.chain,
+                    alert.action, alert.token_address, alert.token_name, alert.token_symbol,
+                    alert.amount_tokens, alert.amount_usd, alert.tx_hash, alert.timestamp.isoformat(),
+                    alert.trader_win_rate, alert.trader_roi, alert.trader_trades_30d,
+                    alert.risk_score, alert.is_safe, alert.consensus_boost, alert.created_at.isoformat()
+                ))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Failed to store trade alert: {e}")
+            return False
+    
+    def get_recent_alerts(self, minutes: int = 15) -> List[Dict]:
+        """Get recent trade alerts within specified minutes"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM trade_alerts 
+                    WHERE created_at > datetime('now', '-{} minutes')
+                    ORDER BY created_at DESC
+                """.format(minutes))
+                
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Failed to get recent alerts: {e}")
+            return []
+    
+    def get_watchlist_users(self, wallet_address: str, chain: str) -> List[str]:
+        """Get all users who have a specific wallet in their watchlist"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT added_by FROM watchlist 
+                    WHERE address = ? AND chain = ? AND active = 1
+                """, (wallet_address, chain))
+                
+                return [str(row[0]) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get watchlist users: {e}")
+            return []
+    
+    def get_all_watchlist_users(self) -> List[str]:
+        """Get all users who have any watchlist entries"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT added_by FROM watchlist 
+                    WHERE active = 1
+                """)
+                
+                return [str(row[0]) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get all watchlist users: {e}")
+            return []
+    
+    def get_latest_buy_alerts(self, limit: int = 10) -> List[Dict]:
+        """Get latest BUY alerts for /buy command"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM trade_alerts 
+                    WHERE action = 'BUY'
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (limit,))
+                
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Failed to get latest buy alerts: {e}")
             return []
 
 # Global database instance

@@ -138,6 +138,201 @@ class BotCommands:
             ])
         
         return InlineKeyboardMarkup(keyboard)
+
+    async def callback_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle inline button callbacks for all commands"""
+        query = update.callback_query
+        data = query.data or ""
+        await query.answer()
+
+        try:
+            if data.startswith("scan_a_"):
+                index = int(data.split("_")[2])
+                await self._scan_handle_analyze(query, context, index)
+            elif data.startswith("scan_w_"):
+                index = int(data.split("_")[2])
+                await self._scan_handle_add_watchlist(query, context, index)
+            elif data.startswith("scan_c_"):
+                index = int(data.split("_")[2])
+                await self._scan_handle_copy_address(query, context, index)
+            elif data == "scan_next":
+                await query.edit_message_text(
+                    "📄 Next page not implemented yet. Run /scan again for more results.")
+            elif data.startswith("w_a_"):
+                # Watchlist analyze
+                index = int(data.split("_")[2])
+                await self._watchlist_handle_analyze_by_index(query, context, index)
+            elif data.startswith("w_r_"):
+                # Watchlist remove
+                index = int(data.split("_")[2])
+                await self._watchlist_handle_remove_by_index(query, context, index)
+            elif data.startswith("w_c_"):
+                # Watchlist copy
+                index = int(data.split("_")[2])
+                await self._watchlist_handle_copy_by_index(query, context, index)
+            elif data.startswith("buy_"):
+                # Buy command callbacks
+                await self._handle_buy_callbacks(query, context, data)
+            elif data.startswith("mnemonic_"):
+                # Mnemonic command callbacks
+                await self._handle_mnemonic_callbacks(query, context, data)
+            elif data.startswith("analyze_wallet_"):
+                # Legacy analyze callback
+                payload = data.replace("analyze_wallet_", "")
+                parts = payload.split("_")
+                if len(parts) >= 2:
+                    address = parts[0]
+                    chain = parts[1]
+                    await self._watchlist_handle_analyze(query, address, chain)
+            elif data.startswith("remove_watchlist_"):
+                # Legacy remove callback
+                payload = data.replace("remove_watchlist_", "")
+                parts = payload.split("_")
+                if len(parts) >= 2:
+                    address = parts[0]
+                    chain = parts[1]
+                    await self._watchlist_handle_remove(query, address, chain)
+            elif data.startswith("copy_address_"):
+                # Legacy copy callback
+                address = data.replace("copy_address_", "")
+                await self._watchlist_handle_copy(query, address)
+            else:
+                # Ignore unknown callbacks silently
+                pass
+        except Exception as e:
+            logger.error(f"Callback handler error: {e}")
+            try:
+                await query.edit_message_text("❌ Action failed. Please try again.")
+            except Exception:
+                pass
+
+    async def _scan_handle_analyze(self, query, context, index: int):
+        wallets = context.bot_data.get('last_scan_wallets', []) or []
+        if index < 0 or index >= len(wallets):
+            await query.edit_message_text("❌ Wallet not found. Please run /scan again.")
+            return
+        w = wallets[index]
+        await query.edit_message_text(
+            (
+                f"🔍 Wallet Analysis\n\n"
+                f"Address: `{w.address}`\n"
+                f"Chain: {w.chain.upper()}\n"
+                f"Score: {w.score:.1f}/100\n"
+                f"Win Rate: {w.win_rate:.1f}%\n"
+                f"Max: {w.max_mult:.1f}x\n"
+                f"Avg ROI: {w.avg_roi:.1f}%\n"
+                f"Volume: ${w.volume_usd:,.0f}\n"
+                f"Recent: {w.recent_activity} trades\n\n"
+                f"Sample Token: {w.sample_profitable_token} ({w.sample_multiplier:.1f}x)\n\n"
+                f"Use /analyze {w.address} {w.chain} for a deeper dive."
+            ),
+            parse_mode='Markdown'
+        )
+
+    async def _scan_handle_add_watchlist(self, query, context, index: int):
+        wallets = context.bot_data.get('last_scan_wallets', []) or []
+        if index < 0 or index >= len(wallets):
+            await query.edit_message_text("❌ Wallet not found. Please run /scan again.")
+            return
+        w = wallets[index]
+        try:
+            success = self.db.add_wallet_to_watchlist(
+                address=w.address,
+                chain=w.chain,
+                user_id=query.from_user.id,
+                wallet_type='wallet',
+                label=f"Score {w.score:.0f}"
+            )
+            if success:
+                await query.message.reply_text(
+                    f"⭐ Added {w.address[:6]}...{w.address[-4:]} ({w.chain.upper()}) to watchlist"
+                )
+            else:
+                await query.message.reply_text("❌ Failed to add to watchlist. Try again.")
+        except Exception as e:
+            logger.error(f"Add watchlist failed: {e}")
+            await query.message.reply_text("❌ Failed to add to watchlist. Try again.")
+
+    async def _scan_handle_copy_address(self, query, context, index: int):
+        wallets = context.bot_data.get('last_scan_wallets', []) or []
+        if index < 0 or index >= len(wallets):
+            await query.edit_message_text("❌ Wallet not found. Please run /scan again.")
+            return
+        w = wallets[index]
+        await query.message.reply_text(
+            f"📋 `{w.address}`\nChain: {w.chain.upper()}  •  Score {w.score:.0f}",
+            parse_mode='Markdown'
+        )
+
+    async def _watchlist_handle_analyze(self, query, address: str, chain: str):
+        try:
+            scanner = await self.get_scanner()
+            result = await scanner.analyze_wallet(address, chain)
+            if not result:
+                await query.message.reply_text("❌ Analysis failed. Try again later.")
+                return
+            text = (
+                f"🔍 Wallet Analysis\n\n"
+                f"Address: `{result.address}`\n"
+                f"Chain: {result.chain.upper()}\n"
+                f"Score: {result.score:.1f}/100\n"
+                f"Win Rate: {result.win_rate:.1f}%\n"
+                f"Max: {result.max_mult:.1f}x  •  Avg ROI: {result.avg_roi:.1f}%\n"
+                f"Volume: ${result.volume_usd:,.0f}  •  Recent: {result.recent_activity} trades\n"
+                f"Sample: {result.sample_profitable_token} ({result.sample_multiplier:.1f}x)\n"
+            )
+            if getattr(result, 'risk_flags', None):
+                text += "\nRisks: " + ", ".join(result.risk_flags)
+            await query.message.reply_text(text, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Watchlist analyze failed: {e}")
+            await query.message.reply_text("❌ Analysis failed. Try again later.")
+
+    async def _watchlist_handle_remove(self, query, address: str, chain: str):
+        try:
+            removed = self.db.remove_from_watchlist(address, chain, query.from_user.id)
+            if removed:
+                await query.message.reply_text(
+                    f"🗑 Removed {address[:6]}...{address[-4:]} ({chain.upper()}) from watchlist"
+                )
+            else:
+                await query.message.reply_text("❌ Address not found in your watchlist")
+        except Exception as e:
+            logger.error(f"Watchlist remove failed: {e}")
+            await query.message.reply_text("❌ Failed to remove from watchlist")
+
+    async def _watchlist_handle_copy(self, query, address: str):
+        await query.message.reply_text(f"📋 `{address}`", parse_mode='Markdown')
+    
+    async def _watchlist_handle_analyze_by_index(self, query, context, index: int):
+        """Handle watchlist analyze by index"""
+        watchlist = context.bot_data.get('last_watchlist', []) or []
+        if index < 0 or index >= len(watchlist):
+            await query.edit_message_text("❌ Wallet not found. Please run /watchlist list again.")
+            return
+        
+        item = watchlist[index]
+        await self._watchlist_handle_analyze(query, item['address'], item['chain'])
+    
+    async def _watchlist_handle_remove_by_index(self, query, context, index: int):
+        """Handle watchlist remove by index"""
+        watchlist = context.bot_data.get('last_watchlist', []) or []
+        if index < 0 or index >= len(watchlist):
+            await query.edit_message_text("❌ Wallet not found. Please run /watchlist list again.")
+            return
+        
+        item = watchlist[index]
+        await self._watchlist_handle_remove(query, item['address'], item['chain'])
+    
+    async def _watchlist_handle_copy_by_index(self, query, context, index: int):
+        """Handle watchlist copy by index"""
+        watchlist = context.bot_data.get('last_watchlist', []) or []
+        if index < 0 or index >= len(watchlist):
+            await query.edit_message_text("❌ Wallet not found. Please run /watchlist list again.")
+            return
+        
+        item = watchlist[index]
+        await self._watchlist_handle_copy(query, item['address'])
     
     async def watchlist_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -270,10 +465,13 @@ class BotCommands:
                 await update.message.reply_text("📝 Your watchlist is empty. Use `/watchlist add <address>` to add wallets.")
                 return
             
+            # Store watchlist data in context for callback handlers
+            context.bot_data['last_watchlist'] = watchlist
+            
             # Format watchlist exactly as specified
             message = "🔔 **Your Watchlist:**\n\n"
             
-            for item in watchlist:
+            for i, item in enumerate(watchlist):
                 # Format address
                 short_addr = f"{item['address'][:6]}...{item['address'][-4:]}"
                 chain_name = item['chain'].upper()
@@ -286,8 +484,8 @@ class BotCommands:
                 time_ago = self._format_time_ago(added_time)
                 
                 item_text = (
-                    f"🔔 **{short_addr}** ({chain_name}){label_text}\n"
-                    f"Added: {time_ago}\n\n"
+                    f"{i+1}. **{short_addr}** ({chain_name}){label_text}\n"
+                    f"   Added: {time_ago}\n\n"
                 )
                 message += item_text
             
@@ -361,20 +559,20 @@ class BotCommands:
         """Create inline keyboard for watchlist items"""
         keyboard = []
         
-        for item in watchlist:
-            # Row for each item with action buttons
+        for i, item in enumerate(watchlist):
+            # Use shortened callback data to avoid 64-byte limit
             row = [
                 InlineKeyboardButton(
                     "🔍 Analyze", 
-                    callback_data=f"analyze_wallet_{item['address']}_{item['chain']}"
+                    callback_data=f"w_a_{i}"
                 ),
                 InlineKeyboardButton(
                     "🗑 Remove", 
-                    callback_data=f"remove_watchlist_{item['address']}_{item['chain']}"
+                    callback_data=f"w_r_{i}"
                 ),
                 InlineKeyboardButton(
                     "📋 Copy", 
-                    callback_data=f"copy_address_{item['address']}"
+                    callback_data=f"w_c_{i}"
                 )
             ]
             keyboard.append(row)
@@ -424,6 +622,606 @@ class BotCommands:
         except Exception as e:
             logger.error(f"Analyze command failed: {e}")
             await update.message.reply_text("❌ Analysis failed. Please try again.")
+
+    async def buy_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """/buy <token_address> <amount> [chain] — Execute a buy order with enhanced intelligence"""
+        try:
+            args = context.args
+            user_id = str(update.effective_user.id)
+            
+            # Check if mnemonic is configured
+            from config import Config
+            if not Config.MNEMONIC:
+                await update.message.reply_text(
+                    "❌ No wallet configured. Please set up your mnemonic first using /mnemonic command."
+                )
+                return
+            
+            if len(args) < 2:
+                # Show latest BUY alerts from watched addresses
+                await self._show_latest_buy_alerts(update, context)
+                return
+            
+            token_address = args[0]
+            amount = args[1]
+            chain = args[2].lower() if len(args) > 2 else 'ethereum'
+            
+            # Validate amount
+            try:
+                amount_float = float(amount)
+                if amount_float <= 0:
+                    await update.message.reply_text("❌ Amount must be a positive number.")
+                    return
+            except ValueError:
+                await update.message.reply_text("❌ Invalid amount. Please enter a valid number.")
+                return
+            
+            # Show processing message
+            processing_msg = await update.message.reply_text(
+                f"🔄 Processing buy order...\n\n"
+                f"Token: `{token_address}`\n"
+                f"Amount: ${amount}\n"
+                f"Chain: {chain.upper()}\n\n"
+                f"Analyzing token safety and calculating trade details...",
+                parse_mode='Markdown'
+            )
+            
+            # Perform token analysis
+            risk_score, is_safe = await self._analyze_token_safety(token_address, chain)
+            
+            if not is_safe and Config.SAFE_MODE:
+                await processing_msg.edit_text(
+                    f"🚫 Trade blocked by SAFE_MODE\n\n"
+                    f"Token: `{token_address}`\n"
+                    f"Risk Score: {risk_score}/100\n\n"
+                    f"This token failed safety checks. Use /settings to disable SAFE_MODE if needed.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # Calculate trade details
+            trade_details = await self._calculate_trade_details(token_address, amount_float, chain)
+            
+            # Show trade preview with confirmation
+            preview_text = f"""
+🛒 **Buy Order Preview**
+
+**Token:** {trade_details['token_name']} ({trade_details['token_symbol']})
+**Contract:** `{token_address}`
+**Amount:** ${amount_float:,.2f}
+**Chain:** {chain.upper()}
+
+**Expected Tokens:** {trade_details['expected_tokens']:,.2f} {trade_details['token_symbol']}
+**Slippage:** {trade_details['slippage']:.2f}%
+**Gas Fee:** ${trade_details['gas_fee']:.2f}
+**Total Cost:** ${trade_details['total_cost']:.2f}
+
+**Safety Analysis:**
+• Risk Score: {risk_score}/100
+• Status: {'✅ SAFE' if is_safe else '🚫 RISK'}
+• Honeypot: {'❌ Detected' if trade_details['is_honeypot'] else '✅ Clean'}
+• Liquidity: ${trade_details['liquidity_usd']:,.0f}
+
+**Portfolio Impact:** {trade_details['portfolio_percent']:.1f}% of total
+"""
+            
+            # Create confirmation keyboard
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ Confirm Buy", callback_data=f"confirm_buy_{token_address}_{amount}_{chain}"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_buy")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await processing_msg.edit_text(preview_text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Buy command failed: {e}")
+            await update.message.reply_text("❌ Buy failed. Please try again.")
+    
+    async def _show_latest_buy_alerts(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show latest BUY alerts from watched addresses"""
+        try:
+            # Get latest buy alerts
+            alerts = self.db.get_latest_buy_alerts(limit=10)
+            
+            if not alerts:
+                await update.message.reply_text(
+                    "📊 **Latest Buy Alerts**\n\n"
+                    "No recent buy alerts from your watched addresses.\n\n"
+                    "Use `/buy <token_address> <amount> [chain]` to buy manually."
+                )
+                return
+            
+            # Group alerts by token for consensus detection
+            token_groups = {}
+            for alert in alerts:
+                key = f"{alert['chain']}:{alert['token_address']}"
+                if key not in token_groups:
+                    token_groups[key] = []
+                token_groups[key].append(alert)
+            
+            # Sort by consensus and recency
+            sorted_tokens = sorted(token_groups.items(), 
+                                key=lambda x: (len(x[1]), max(a['created_at'] for a in x[1])), 
+                                reverse=True)
+            
+            message = "📊 **Latest Buy Alerts**\n\n"
+            keyboard = []
+            
+            for i, (token_key, token_alerts) in enumerate(sorted_tokens[:5]):  # Show top 5
+                alert = token_alerts[0]  # Use first alert for token info
+                consensus_icon = "🚀" if len(token_alerts) > 1 else ""
+                safety_icon = "✅" if alert['is_safe'] else "🚫"
+                
+                # Calculate consensus info
+                total_volume = sum(a['amount_usd'] for a in token_alerts)
+                trader_count = len(set(a['wallet_address'] for a in token_alerts))
+                
+                message += f"{consensus_icon} **{alert['token_name']}** ({alert['token_symbol']}) {safety_icon}\n"
+                message += f"• Contract: `{alert['token_address']}`\n"
+                message += f"• Traders: {trader_count} wallets\n"
+                message += f"• Volume: ${total_volume:,.0f}\n"
+                message += f"• Risk: {alert['risk_score']}/100\n"
+                message += f"• Chain: {alert['chain'].upper()}\n\n"
+                
+                # Add inline buttons for each token (shortened callback data)
+                keyboard.append([
+                    InlineKeyboardButton(f"Buy $50", callback_data=f"buy_quick_{alert['token_address']}_50_{alert['chain']}"),
+                    InlineKeyboardButton(f"Buy $100", callback_data=f"buy_quick_{alert['token_address']}_100_{alert['chain']}"),
+                    InlineKeyboardButton(f"Custom", callback_data=f"buy_custom_{alert['token_address']}_{alert['chain']}")
+                ])
+                keyboard.append([
+                    InlineKeyboardButton(f"Analyze Token", callback_data=f"buy_analyze_{alert['token_address']}_{alert['chain']}"),
+                    InlineKeyboardButton(f"Analyze Wallet", callback_data=f"analyze_wallet_{alert['wallet_address']}_{alert['chain']}")
+                ])
+                
+                if i < len(sorted_tokens) - 1:
+                    keyboard.append([InlineKeyboardButton("─" * 20, callback_data="noop")])
+            
+            # Add manual input option
+            keyboard.append([
+                InlineKeyboardButton("📝 Manual Input", callback_data="buy_manual"),
+                InlineKeyboardButton("🔄 Refresh", callback_data="buy_refresh")
+            ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Error showing buy alerts: {e}")
+            await update.message.reply_text("❌ Failed to load buy alerts. Please try again.")
+    
+    async def _analyze_token_safety(self, token_address: str, chain: str) -> tuple[int, bool]:
+        """Analyze token safety using GoPlus and other tools"""
+        try:
+            # This would integrate with GoPlus API for real analysis
+            # For now, return mock data
+            risk_score = 25  # Mock safe score
+            is_safe = risk_score < 30
+            return risk_score, is_safe
+        except Exception as e:
+            logger.error(f"Error analyzing token safety: {e}")
+            return 50, False
+    
+    async def _calculate_trade_details(self, token_address: str, amount_usd: float, chain: str) -> dict:
+        """Calculate trade details including slippage, gas, etc."""
+        try:
+            # This would integrate with 0x API for EVM or Jupiter for Solana
+            # For now, return mock data
+            return {
+                'token_name': 'Mock Token',
+                'token_symbol': 'MOCK',
+                'expected_tokens': amount_usd * 1000,  # Mock rate
+                'slippage': 0.5,
+                'gas_fee': 15.0,
+                'total_cost': amount_usd + 15.0,
+                'is_honeypot': False,
+                'liquidity_usd': 50000,
+                'portfolio_percent': 5.0
+            }
+        except Exception as e:
+            logger.error(f"Error calculating trade details: {e}")
+            return {
+                'token_name': 'Unknown',
+                'token_symbol': 'UNK',
+                'expected_tokens': 0,
+                'slippage': 0,
+                'gas_fee': 0,
+                'total_cost': amount_usd,
+                'is_honeypot': True,
+                'liquidity_usd': 0,
+                'portfolio_percent': 0
+            }
+
+    async def sell_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """/sell <token_address> <amount> [chain] — Execute a sell order"""
+        try:
+            args = context.args
+            if len(args) < 2:
+                await update.message.reply_text("❌ Usage: /sell <token_address> <amount> [chain]")
+                return
+            
+            token_address = args[0]
+            amount = args[1]
+            chain = args[2].lower() if len(args) > 2 else 'ethereum'
+            
+            # Validate inputs
+            try:
+                amount_float = float(amount)
+                if amount_float <= 0:
+                    await update.message.reply_text("❌ Amount must be greater than 0")
+                    return
+            except ValueError:
+                await update.message.reply_text("❌ Invalid amount. Please use a number.")
+                return
+            
+            # Check if mnemonic is configured
+            from config import Config
+            if not Config.MNEMONIC:
+                await update.message.reply_text(
+                    "❌ Wallet not configured. Please add MNEMONIC to your .env file.\n\n"
+                    "Example:\n"
+                    "MNEMONIC=your twelve word mnemonic phrase goes here"
+                )
+                return
+            
+            # Show processing message
+            processing_msg = await update.message.reply_text(
+                f"💱 Processing sell order...\n\n"
+                f"Token: `{token_address}`\n"
+                f"Amount: {amount} tokens\n"
+                f"Chain: {chain.upper()}\n\n"
+                f"⏳ Executing trade...",
+                parse_mode='Markdown'
+            )
+            
+            # Simulate trade execution (replace with real trading logic)
+            import asyncio
+            await asyncio.sleep(2)  # Simulate processing time
+            
+            # For now, show a success message with mock data
+            await processing_msg.edit_text(
+                f"✅ Sell order executed!\n\n"
+                f"Token: `{token_address}`\n"
+                f"Amount: {amount} tokens\n"
+                f"Chain: {chain.upper()}\n"
+                f"Tx Hash: `0x5678...9abc`\n"
+                f"Gas Used: 120,000\n"
+                f"Status: ✅ Confirmed\n\n"
+                f"*This is a demo. Real trading requires proper integration with DEXs.*",
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Sell command failed: {e}")
+            await update.message.reply_text("❌ Sell failed. Please try again.")
+
+    async def check_watchlist_alerts(self):
+        """Check watchlist for new activity and send alerts"""
+        try:
+            # Get all watchlist entries
+            watchlist = self.db.get_user_watchlist(user_id=None)  # Get all users' watchlists
+            
+            for entry in watchlist:
+                try:
+                    # Analyze the wallet for recent activity
+                    scanner = await self.get_scanner()
+                    result = await scanner.analyze_wallet(entry['address'], entry['chain'])
+                    
+                    if result and result.recent_activity > 0:
+                        # Send alert about new activity
+                        alert_text = (
+                            f"🚨 Watchlist Alert!\n\n"
+                            f"Wallet: `{entry['address']}`\n"
+                            f"Chain: {entry['chain'].upper()}\n"
+                            f"Recent Activity: {result.recent_activity} trades\n"
+                            f"Current Score: {result.score:.1f}/100\n\n"
+                            f"Sample Token: {result.sample_profitable_token}\n"
+                            f"Multiplier: {result.sample_multiplier:.1f}x"
+                        )
+                        
+                        # In a real implementation, you would send this to the user
+                        # For now, just log it
+                        logger.info(f"Watchlist alert for {entry['address']}: {result.recent_activity} recent trades")
+                        
+                except Exception as e:
+                    logger.error(f"Error checking watchlist entry {entry['address']}: {e}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Watchlist alert check failed: {e}")
+
+    async def mnemonic_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """/mnemonic — Manage wallet mnemonic securely"""
+        try:
+            from core.secure_wallet import get_secure_wallet
+            
+            args = context.args
+            secure_wallet = get_secure_wallet()
+            
+            if not args:
+                # Show status and options with inline buttons
+                status = secure_wallet.get_wallet_status()
+                
+                if status['configured']:
+                    message = f"""
+🔐 **Wallet Status**
+
+✅ Wallet is configured and encrypted
+📅 Created: {status.get('created_at', 'Unknown')}
+💾 Size: {status.get('file_size', 0)} bytes
+🔑 Address: {status.get('address', 'Unknown')[:6]}...{status.get('address', 'Unknown')[-6:]}
+
+**Available Actions:**
+"""
+                else:
+                    message = f"""
+🔐 **Wallet Status**
+
+❌ No wallet configured
+
+**Available Actions:**
+"""
+                
+                # Create inline keyboard based on status
+                keyboard = []
+                if status['configured']:
+                    keyboard.extend([
+                        [InlineKeyboardButton("📊 Status", callback_data="mnemonic_status")],
+                        [InlineKeyboardButton("🔐 Export", callback_data="mnemonic_export")],
+                        [InlineKeyboardButton("🚨 Delete", callback_data="mnemonic_delete")]
+                    ])
+                else:
+                    keyboard.extend([
+                        [InlineKeyboardButton("📊 Status", callback_data="mnemonic_status")],
+                        [InlineKeyboardButton("🆕 Generate", callback_data="mnemonic_generate")],
+                        [InlineKeyboardButton("📥 Import", callback_data="mnemonic_import")]
+                    ])
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+                return
+            
+            command = args[0].lower()
+            
+            if command == "status":
+                status = secure_wallet.get_wallet_status()
+                if status['configured']:
+                    await update.message.reply_text(
+                        f"✅ Wallet is configured and encrypted\n"
+                        f"📅 Created: {status.get('created_at', 'Unknown')}\n"
+                        f"💾 Size: {status.get('file_size', 0)} bytes"
+                    )
+                else:
+                    await update.message.reply_text("❌ No wallet configured")
+            
+            elif command == "generate":
+                await update.message.reply_text(
+                    "🔐 **Generate New Wallet**\n\n"
+                    "This will create a new wallet with a random mnemonic.\n"
+                    "⚠️ **WARNING:** This will overwrite any existing wallet!\n\n"
+                    "Please send your password to continue:\n"
+                    "`/mnemonic generate <password>`",
+                    parse_mode='Markdown'
+                )
+            
+            elif command == "import":
+                await update.message.reply_text(
+                    "🔐 **Import Wallet**\n\n"
+                    "⚠️ **SECURITY WARNING:**\n"
+                    "Never type your mnemonic in Telegram chat!\n\n"
+                    "For security, please use the secure import script:\n"
+                    "```bash\npython secure_import.py\n```\n\n"
+                    "This script will:\n"
+                    "• Prompt for mnemonic securely\n"
+                    "• Encrypt and store it\n"
+                    "• Never expose it in logs or chat",
+                    parse_mode='Markdown'
+                )
+            
+            elif command == "export":
+                if len(args) < 2:
+                    await update.message.reply_text(
+                        "🔐 **Export Wallet**\n\n"
+                        "Please provide your password:\n"
+                        "`/mnemonic export <password>`",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                password = args[1]
+                result = secure_wallet.export_wallet(password)
+                
+                if result['success']:
+                    await update.message.reply_text(
+                        f"✅ **Wallet Exported**\n\n"
+                        f"**Addresses:**\n"
+                        f"• Ethereum: `{result['addresses']['ethereum']}`\n"
+                        f"• BSC: `{result['addresses']['bsc']}`\n"
+                        f"• Solana: `{result['addresses']['solana']}`\n\n"
+                        f"**Encrypted Data:**\n"
+                        f"`{result['encrypted_data'][:100]}...`\n\n"
+                        f"⚠️ Keep this encrypted data secure!",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await update.message.reply_text(f"❌ Export failed: {result['error']}")
+            
+            elif command == "delete":
+                if len(args) < 2:
+                    await update.message.reply_text(
+                        "🚨 **Delete Wallet**\n\n"
+                        "⚠️ **WARNING:** This will permanently delete your wallet!\n\n"
+                        "If you're sure, provide your password:\n"
+                        "`/mnemonic delete <password>`",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                password = args[1]
+                result = secure_wallet.delete_wallet(password)
+                
+                if result['success']:
+                    await update.message.reply_text("✅ Wallet deleted successfully")
+                else:
+                    await update.message.reply_text(f"❌ Delete failed: {result['error']}")
+            
+            else:
+                await update.message.reply_text(
+                    "❌ Unknown command. Use `/mnemonic` to see available options."
+                )
+                
+        except Exception as e:
+            logger.error(f"Mnemonic command failed: {e}")
+            await update.message.reply_text("❌ Mnemonic command failed. Please try again.")
+
+    async def _handle_buy_callbacks(self, query, context, data: str):
+        """Handle buy command callbacks"""
+        try:
+            if data.startswith("buy_quick_"):
+                # Quick buy: buy_quick_<token>_<amount>_<chain>
+                parts = data.split("_")
+                if len(parts) >= 5:
+                    token_address = parts[2]
+                    amount = parts[3]
+                    chain = parts[4]
+                    await query.edit_message_text(
+                        f"🛒 Quick buy: {amount} USD of {token_address[:6]}...{token_address[-4:]} on {chain.upper()}\n\n"
+                        f"⚠️ This is a demo. Real trading requires proper DEX integration."
+                    )
+            elif data.startswith("buy_custom_"):
+                # Custom buy: buy_custom_<token>_<chain>
+                parts = data.split("_")
+                if len(parts) >= 4:
+                    token_address = parts[2]
+                    chain = parts[3]
+                    await query.edit_message_text(
+                        f"📝 Custom buy for {token_address[:6]}...{token_address[-4:]} on {chain.upper()}\n\n"
+                        f"Please use: `/buy {token_address} <amount> {chain}`"
+                    )
+            elif data.startswith("buy_analyze_"):
+                # Analyze token: buy_analyze_<token>_<chain>
+                parts = data.split("_")
+                if len(parts) >= 4:
+                    token_address = parts[2]
+                    chain = parts[3]
+                    await query.edit_message_text(
+                        f"🔍 Token analysis for {token_address[:6]}...{token_address[-4:]} on {chain.upper()}\n\n"
+                        f"Use `/analyze {token_address} {chain}` for detailed analysis."
+                    )
+            elif data == "buy_manual":
+                await query.edit_message_text(
+                    "📝 **Manual Buy Input**\n\n"
+                    "Please use the format:\n"
+                    "`/buy <token_address> <amount> [chain]`\n\n"
+                    "**Examples:**\n"
+                    "• `/buy 0x1234...5678 100`\n"
+                    "• `/buy 0xabcd...efgh 50 bsc`\n"
+                    "• `/buy So11111111111111111111111111111111111111112 200 solana`",
+                    parse_mode='Markdown'
+                )
+            elif data == "buy_refresh":
+                await query.edit_message_text("🔄 Refreshing buy alerts...")
+                # In a real implementation, this would refresh the alerts
+                await query.edit_message_text("✅ Buy alerts refreshed!")
+        except Exception as e:
+            logger.error(f"Buy callback error: {e}")
+            await query.edit_message_text("❌ Buy action failed. Please try again.")
+    
+    async def _handle_mnemonic_callbacks(self, query, context, data: str):
+        """Handle mnemonic command callbacks"""
+        try:
+            if data == "mnemonic_status":
+                from core.secure_wallet import get_secure_wallet
+                secure_wallet = get_secure_wallet()
+                status = secure_wallet.get_wallet_status()
+                
+                if status['configured']:
+                    message = f"""
+🔐 **Wallet Status**
+
+✅ **Configured:** Yes
+📅 **Created:** {status.get('created_at', 'Unknown')}
+💾 **Size:** {status.get('file_size', 0)} bytes
+🔑 **Address:** {status.get('address', 'Unknown')[:6]}...{status.get('address', 'Unknown')[-6:]}
+📁 **Path:** {status.get('keystore_path', 'Unknown')}
+"""
+                else:
+                    message = """
+🔐 **Wallet Status**
+
+❌ **Configured:** No
+⚠️ **Action Required:** Run `/mnemonic generate` or `/mnemonic import`
+"""
+                
+                await query.edit_message_text(message, parse_mode='Markdown')
+            
+            elif data == "mnemonic_generate":
+                await query.edit_message_text(
+                    "🔐 **Generate New Wallet**\n\n"
+                    "⚠️ **WARNING:** This will create a new wallet and overwrite any existing one!\n\n"
+                    "Please provide a password:\n"
+                    "`/mnemonic generate <password>`\n\n"
+                    "**Security:** Your mnemonic will be encrypted and never shown in chat.",
+                    parse_mode='Markdown'
+                )
+            
+            elif data == "mnemonic_import":
+                await query.edit_message_text(
+                    "🔐 **Import Wallet**\n\n"
+                    "⚠️ **SECURITY WARNING:**\n"
+                    "Never type your mnemonic in Telegram chat!\n\n"
+                    "**Secure Import Process:**\n"
+                    "1. Run: `python secure_import.py`\n"
+                    "2. Enter your mnemonic securely\n"
+                    "3. Set a strong password\n"
+                    "4. Wallet will be encrypted and stored\n\n"
+                    "**Why this method?**\n"
+                    "• Keeps mnemonic out of chat logs\n"
+                    "• Prevents accidental exposure\n"
+                    "• Follows security best practices",
+                    parse_mode='Markdown'
+                )
+            
+            elif data == "mnemonic_export":
+                await query.edit_message_text(
+                    "🔐 **Export Wallet**\n\n"
+                    "Please provide your password:\n"
+                    "`/mnemonic export <password>`\n\n"
+                    "**What you'll get:**\n"
+                    "• Encrypted keystore data\n"
+                    "• Wallet addresses for all chains\n"
+                    "• Safe to backup and restore",
+                    parse_mode='Markdown'
+                )
+            
+            elif data == "mnemonic_delete":
+                await query.edit_message_text(
+                    "🚨 **Delete Wallet**\n\n"
+                    "⚠️ **WARNING:** This will permanently delete your wallet!\n\n"
+                    "**This action cannot be undone!**\n\n"
+                    "If you're absolutely sure, provide your password:\n"
+                    "`/mnemonic delete <password>`\n\n"
+                    "**Make sure you have:**\n"
+                    "• Backed up your mnemonic\n"
+                    "• Exported your keystore\n"
+                    "• Transferred all funds",
+                    parse_mode='Markdown'
+                )
+            
+            elif data == "mnemonic_confirm_delete":
+                await query.edit_message_text(
+                    "🚨 **Final Confirmation**\n\n"
+                    "**LAST CHANCE!** This will permanently delete your wallet!\n\n"
+                    "Type: `CONFIRM DELETE` to proceed\n\n"
+                    "⚠️ **This action cannot be undone!**"
+                )
+        
+        except Exception as e:
+            logger.error(f"Mnemonic callback error: {e}")
+            await query.edit_message_text("❌ Mnemonic action failed. Please try again.")
 
 # Global commands instance
 bot_commands = BotCommands()

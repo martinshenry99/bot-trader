@@ -136,6 +136,15 @@ class DiscoveryScanner:
         except Exception as e:
             logger.error(f"Discovery scan failed: {e}")
             return []
+
+    async def analyze_wallet(self, address: str, chain: str) -> Optional[DiscoveredWallet]:
+        """Analyze a single wallet by address and chain using the same pipeline."""
+        try:
+            candidate = {'address': address, 'chain': chain}
+            return await self._analyze_candidate_wallet(candidate)
+        except Exception as e:
+            logger.error(f"analyze_wallet failed for {address} on {chain}: {e}")
+            return None
     
     async def _seed_discovery(self) -> List[Dict[str, Any]]:
         """Step 1: Seed discovery from multiple sources"""

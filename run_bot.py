@@ -83,6 +83,8 @@ def main():
         application.add_handler(CommandHandler("scan", commands.scan_command))
         application.add_handler(CommandHandler("watchlist", commands.watchlist_command))
         application.add_handler(CommandHandler("analyze", commands.analyze_command))
+        application.add_handler(CommandHandler("buy", commands.buy_command))
+        application.add_handler(CommandHandler("sell", commands.sell_command))
         
         # Minimal /start and /help placeholders to avoid missing handlers
         async def _start(update, context):
@@ -102,6 +104,8 @@ def main():
                 "- /watchlist — Manage your watchlist (add/remove/list/rename)\n"
                 "\n"
                 "Trading & Portfolio:\n"
+                "- /buy <token_address> <amount> [chain] — Execute a buy order\n"
+                "- /sell <token_address> <amount> [chain] — Execute a sell order\n"
                 "- /portfolio — Show current tracked positions and PnL\n"
                 "- /panic_sell — Market-sell tracked tokens immediately (safety checks apply)\n"
                 "\n"
@@ -117,12 +121,43 @@ def main():
         application.add_handler(CommandHandler("start", _start))
         application.add_handler(CommandHandler("help", _help))
         
-        # Callback handler placeholder (buttons handled within commands callbacks elsewhere if added)
-        async def _noop_callback(update, context):
-            await update.callback_query.answer()
-        application.add_handler(CallbackQueryHandler(_noop_callback))
+        # Wire inline button callbacks from commands
+        application.add_handler(CallbackQueryHandler(commands.callback_handler))
+
+        # Set Telegram command menu via async post_init hook
+        from telegram import BotCommand
+        async def _post_init(app):
+            try:
+                await app.bot.set_my_commands([
+                    BotCommand("start", "Start the bot"),
+                    BotCommand("help", "Show help menu"),
+                    BotCommand("scan", "Discover high-performing trader wallets"),
+                    BotCommand("watchlist", "Manage your watchlist"),
+                    BotCommand("analyze", "Analyze a wallet or token"),
+                    BotCommand("buy", "Buy a token"),
+                    BotCommand("sell", "Sell a token"),
+                    BotCommand("portfolio", "Show current positions and PnL"),
+                    BotCommand("panic_sell", "Sell all tracked tokens now"),
+                    BotCommand("balance", "Show wallet balances"),
+                    BotCommand("address", "Show wallet addresses"),
+                    BotCommand("mnemonic", "Keystore management")
+                ])
+                
+                # Start watchlist monitor
+                try:
+                    from monitor.watchlist_monitor import watchlist_monitor
+                    await watchlist_monitor.initialize()
+                    await watchlist_monitor.start_monitoring()
+                    logger.info("Watchlist monitor started")
+                except Exception as e:
+                    logger.error(f"Failed to start watchlist monitor: {e}")
+                    
+            except Exception:
+                pass
+        application.post_init = _post_init
         
         logger.info("Bot handlers configured")
+        
         logger.info("Starting bot...")
         logger.info("Send /start to your bot to begin!")
         

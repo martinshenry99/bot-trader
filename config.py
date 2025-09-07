@@ -44,6 +44,9 @@ class Config:
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///meme_trader.db')
     
+    # Wallet Configuration
+    MNEMONIC = os.getenv('MNEMONIC')
+    
     # API Settings
     MAX_RETRIES = int(os.getenv('MAX_RETRIES', '3'))
     REQUEST_TIMEOUT = int(os.getenv('REQUEST_TIMEOUT', '30'))
