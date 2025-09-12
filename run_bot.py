@@ -28,17 +28,51 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def error_handler(update, context):
-    """Handle errors in the Telegram bot"""
-    logger.error(f"Update {update} caused error: {context.error}")
-    
-    if isinstance(context.error, Conflict):
-        logger.error("Another bot instance is already running. Please stop it first.")
-        await context.application.stop()
-        sys.exit(1)
-    elif isinstance(context.error, NetworkError):
-        logger.error("Network error occurred. Please check your connection.")
-    else:
-        logger.error(f"An unexpected error occurred: {context.error}")
+    """Enhanced error handler with better user feedback"""
+    try:
+        if update:
+            chat_id = update.effective_chat.id if update.effective_chat else None
+        else:
+            chat_id = None
+            
+        error = context.error
+        logger.error(f"Update {update} caused error: {error}")
+        
+        if isinstance(error, Conflict):
+            logger.error("Another bot instance is already running")
+            await context.application.stop()
+            if chat_id:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ Bot instance conflict detected. Restarting..."
+                )
+            sys.exit(1)
+            
+        elif isinstance(error, NetworkError):
+            logger.error(f"Network error: {error}")
+            if chat_id:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="🌐 Network error occurred. Please try again in a few moments."
+                )
+                
+        else:
+            logger.error(f"Unexpected error: {error}")
+            if chat_id:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=(
+                        "❌ An error occurred while processing your request.\n"
+                        "Our team has been notified. Please try again later.\n\n"
+                        "Common fixes:\n"
+                        "• Check your input format\n"
+                        "• Verify addresses and amounts\n"
+                        "• Try again in a few minutes"
+                    )
+                )
+                
+    except Exception as e:
+        logger.error(f"Error in error handler: {e}")
 
 def main():
     """Main startup function"""
@@ -96,14 +130,14 @@ def main():
         # Add error handler
         application.add_error_handler(error_handler)
         
-        # Wire basic commands available now
-        application.add_handler(CommandHandler("scan", commands.scan_command))
-        application.add_handler(CommandHandler("watchlist", commands.watchlist_command))
-        application.add_handler(CommandHandler("analyze", commands.analyze_command))
-        application.add_handler(CommandHandler("buy", commands.buy_command))
-        application.add_handler(CommandHandler("sell", commands.sell_command))
+        # Register all handlers using the new registration module
+        from bot.handlers import register_bot_handlers
         
-        # Minimal /start and /help placeholders to avoid missing handlers
+        if not register_bot_handlers(application):
+            logger.error("Failed to register handlers - check logs for details")
+            return False
+            
+        logger.info("Successfully registered all handlers")
         async def _start(update, context):
             await update.message.reply_text("Meme Trader V4 Pro online. Try /scan or /watchlist.")
         async def _help(update, context):

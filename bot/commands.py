@@ -51,42 +51,121 @@ class BotCommands:
 
     async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        /scan command - DISCOVERY engine
-        
-        Purpose: find NEW high-quality trader wallets across supported chains (ETH/BSC/SOL)
-        NOT implemented as "rescan watchlist wallets only"
+        /scan command - Enhanced discovery engine with settings integration
         """
         try:
-            await update.message.reply_text("🔍 Starting discovery scan... This may take up to 90 seconds.")
-            
-            # Get scanner and run discovery
-            scanner = await self.get_scanner()
-            discovered_wallets = await scanner.scan_discovery(limit=10)
-            
-            if not discovered_wallets:
-                await update.message.reply_text("❌ No qualified wallets found. Try again later or adjust minimum score.")
-                return
-            
-            # Format results exactly as specified
-            message = self._format_scan_results(discovered_wallets)
-            
-            # Store wallet data in bot context for callback handlers
-            context.bot_data['last_scan_wallets'] = discovered_wallets
-            
-            # Create inline keyboard with action buttons
-            keyboard = self._create_scan_keyboard(discovered_wallets)
-            
-            await update.message.reply_text(
-                message,
-                reply_markup=keyboard,
-                parse_mode='Markdown'
+            # Send initial status
+            status_message = await update.message.reply_text(
+                "🔍 Starting advanced wallet discovery...\n"
+                "⏳ Estimated time: 30-60 seconds"
             )
             
-            logger.info(f"Scan completed for user {update.effective_user.id}: {len(discovered_wallets)} wallets found")
+            # Get user settings
+            user_id = update.effective_user.id
+            min_score = int(self.db.get_user_setting(user_id, "scan_min_score", "70"))
+            max_results = int(self.db.get_user_setting(user_id, "scan_max_results", "50"))
+            chains = self.db.get_user_setting(user_id, "scan_chains", "eth,bsc").split(",")
             
+            # Progress updates
+            await status_message.edit_text(
+                f"🔍 Running discovery scan...\n"
+                f"Chains: {', '.join(chains).upper()}\n"
+                f"Min Score: {min_score}\n"
+                f"Max Results: {max_results}\n\n"
+                "⏳ Please wait..."
+            )
+            
+            # Get scanner and run discovery
+            try:
+                scanner = await self.get_scanner()
+                results = await scanner.scan_with_settings(user_id)
+                discovered_wallets = results.get('results', [])
+                stats = results.get('stats', {})
+                
+                if not discovered_wallets:
+                    await status_message.edit_text(
+                        "❌ No wallets found matching criteria.\n\n"
+                        f"Scanned: {stats.get('total_scanned', 0)} wallets\n"
+                        "Try adjusting thresholds in /settings"
+                    )
+                    return
+                
+                # Format main message
+                msg = (
+                    "📊 Discovery Scan Results\n\n"
+                    f"Scanned: {stats.get('total_scanned', 0)} wallets\n"
+                    f"Passed Filters: {stats.get('passed_filters', 0)}\n"
+                    f"Insiders Found: {stats.get('insider_detected', 0)}\n"
+                    f"Chains: {', '.join(chains).upper()}\n\n"
+                )
+                
+                # Add wallet details
+                shown_wallets = discovered_wallets[:10]
+                for i, wallet in enumerate(shown_wallets, 1):
+                    score_icons = "🟢" if wallet['score'] >= 85 else "🟡" if wallet['score'] >= 70 else "🔵"
+                    
+                    msg += (
+                        f"{i}. {score_icons} `{wallet['address'][:8]}...{wallet['address'][-6:]}`\n"
+                        f"   Score: {wallet['score']}/100 | Chain: {wallet['chain'].upper()}\n"
+                        f"   Win Rate: {wallet.get('win_rate', 0):.1f}% | ROI Avg: {wallet.get('avg_roi', 1):.1f}x\n"
+                    )
+                    
+                    if wallet.get('insider_score'):
+                        msg += f"   🚨 Insider Score: {wallet['insider_score']}\n"
+                    
+                    recent_trades = wallet.get('trades_30d', 0)
+                    if recent_trades > 0:
+                        msg += f"   ⚡ Active: {recent_trades} trades in 30d\n"
+                        
+                    msg += "\n"
+                
+                # Add remaining count if any
+                remaining = len(discovered_wallets) - 10
+                if remaining > 0:
+                    msg += f"\n... and {remaining} more wallets"
+                
+                # Build action keyboard
+                keyboard = []
+                if remaining > 0:
+                    keyboard.append([InlineKeyboardButton("📋 Show More", callback_data="scan:more:10")])
+                
+                keyboard.extend([
+                    [
+                        InlineKeyboardButton("⚙️ Settings", callback_data="settings:scan"),
+                        InlineKeyboardButton("🔄 Refresh", callback_data="scan:refresh")
+                    ]
+                ])
+                
+                # Store results for callback handlers
+                context.bot_data['last_scan_results'] = discovered_wallets
+                context.bot_data['last_scan_page'] = 0
+                
+                # Send final results
+                await status_message.edit_text(
+                    msg,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+                
+                logger.info(f"Scan completed for user {user_id}: {len(discovered_wallets)} wallets found")
+                
+            except Exception as e:
+                logger.error(f"Scanner error: {e}")
+                await status_message.edit_text(
+                    "❌ Scan process failed.\n"
+                    "This could be due to:\n"
+                    "• API rate limits\n"
+                    "• Network issues\n"
+                    "• Internal error\n\n"
+                    "Please try again in a few minutes."
+                )
+                
         except Exception as e:
-            logger.error(f"Scan command failed: {e}")
-            await update.message.reply_text("❌ Scan failed. Please try again later.")
+            logger.error(f"Scan command error: {e}")
+            await update.message.reply_text(
+                "❌ An error occurred while processing your request.\n"
+                "Please try again later."
+            )
     
     def _format_scan_results(self, wallets: List) -> str:
         """Format scan results, only showing wallets with avg ROI >= 200x"""
@@ -600,42 +679,166 @@ class BotCommands:
     
     async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        /analyze <address_or_contract> [depth]
+        Enhanced /analyze command with comprehensive analysis
         
-        Wallet: returns score breakdown, top tokens, counterparties, top profitable trades, graph summary
-        Token: returns honeypot boolean, liquidity_usd, locked boolean + expiry, owner, top holders, risk flags
+        Analyzes wallets and tokens with detailed metrics:
+        - Wallet: performance metrics, trading patterns, risk analysis
+        - Token: liquidity analysis, holder analysis, security checks
         """
         try:
+            # Parse and validate arguments
             args = context.args
             if not args:
-                await update.message.reply_text("❌ Please provide an address to analyze: `/analyze <address> [depth]`")
+                await update.message.reply_text(
+                    "ℹ️ Usage: /analyze <address> [chain] [depth]\n\n"
+                    "Examples:\n"
+                    "• /analyze 0xabc...def\n"
+                    "• /analyze 0xabc...def eth\n"
+                    "• /analyze 0xabc...def bsc 4\n\n"
+                    "Supported chains: ETH, BSC, SOL"
+                )
                 return
             
-            address = args[0]
-            depth = int(args[1]) if len(args) > 1 else 3
+            # Initial status message
+            status_message = await update.message.reply_text(
+                "🔍 Starting analysis...\n"
+                "⏳ This may take a few moments."
+            )
             
-            # Auto-detect chain
-            chain = self._detect_chain(address)
+            # Parse arguments
+            address = args[0].lower()
+            chain = args[1].lower() if len(args) > 1 else self._detect_chain(address)
+            depth = int(args[2]) if len(args) > 2 else 3
+            
             if not chain:
-                await update.message.reply_text("❌ Could not detect chain. Please specify: `/analyze <address> <chain>`")
+                await status_message.edit_text(
+                    "❌ Could not detect chain.\n"
+                    "Please specify: /analyze <address> <chain>"
+                )
                 return
             
-            # For now, return basic analysis
-            analysis_text = f"🔍 **Analysis for {address[:6]}...{address[-4:]}**\n\n"
-            analysis_text += f"Chain: {chain.upper()}\n"
-            analysis_text += f"Analysis depth: {depth}\n\n"
-            analysis_text += "Detailed analysis coming soon..."
+            if chain not in ["eth", "bsc", "sol"]:
+                await status_message.edit_text(
+                    f"❌ Unsupported chain: {chain}\n"
+                    "Supported chains: ETH, BSC, SOL"
+                )
+                return
             
-            # Create inline keyboard
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("⭐ Add to Watchlist", callback_data=f"add_watchlist_{address}_{chain}")],
-                [InlineKeyboardButton("📋 Copy Address", callback_data=f"copy_address_{address}")]
-            ])
+            # Progress update
+            await status_message.edit_text(
+                f"🔍 Analyzing {address[:6]}...{address[-4:]} on {chain.upper()}\n"
+                "⏳ Running comprehensive analysis..."
+            )
             
+            try:
+                # Get scanner instance
+                scanner = await self.get_scanner()
+                
+                # Run analysis with depth
+                analysis = await scanner.analyze_address(
+                    address=address,
+                    chain=chain,
+                    depth=depth
+                )
+                
+                if not analysis:
+                    await status_message.edit_text(
+                        "❌ Analysis failed. Address may be invalid or inactive."
+                    )
+                    return
+                
+                # Format main analysis message
+                msg = (
+                    f"� Analysis Report for `{address[:8]}...{address[-6:]}`\n"
+                    f"Chain: {chain.upper()} | Depth: {depth}\n\n"
+                )
+                
+                # Add performance metrics
+                if 'metrics' in analysis:
+                    metrics = analysis['metrics']
+                    msg += (
+                        "💫 Performance Metrics\n"
+                        f"• Score: {metrics.get('score', 0)}/100\n"
+                        f"• Win Rate: {metrics.get('win_rate', 0):.1f}%\n"
+                        f"• Avg ROI: {metrics.get('avg_roi', 1):.1f}x\n"
+                        f"• Volume: ${metrics.get('volume_usd', 0)/1000:.1f}k\n\n"
+                    )
+                
+                # Add trading patterns
+                if 'patterns' in analysis:
+                    patterns = analysis['patterns']
+                    msg += (
+                        "📈 Trading Patterns\n"
+                        f"• Active Days: {patterns.get('active_days', 0)}\n"
+                        f"• Avg Hold Time: {patterns.get('avg_hold_time', 0)}h\n"
+                        f"• Favorite DEX: {patterns.get('preferred_dex', 'Unknown')}\n\n"
+                    )
+                
+                # Add risk analysis
+                if 'risk' in analysis:
+                    risk = analysis['risk']
+                    msg += (
+                        "⚠️ Risk Analysis\n"
+                        f"• Risk Level: {risk.get('level', 'Unknown')}\n"
+                    )
+                    if risk.get('flags'):
+                        msg += "• Flags: " + ", ".join(risk['flags']) + "\n\n"
+                    
+                # Add insider metrics if available
+                if 'insider' in analysis:
+                    insider = analysis['insider']
+                    msg += (
+                        "🔐 Insider Analysis\n"
+                        f"• Score: {insider.get('score', 0)}/100\n"
+                        f"• Early Entries: {insider.get('early_entries', 0)}\n"
+                        f"• Pattern Matches: {insider.get('pattern_matches', 0)}\n\n"
+                    )
+                
+                # Build action keyboard
+                keyboard = [
+                    [
+                        InlineKeyboardButton("👀 Add to Watchlist", callback_data=f"watch:add:{chain}:{address}"),
+                        InlineKeyboardButton("📋 Copy Address", callback_data=f"copy:{address}")
+                    ],
+                    [
+                        InlineKeyboardButton("🔄 Refresh", callback_data=f"analyze:{chain}:{address}"),
+                        InlineKeyboardButton("📊 Depth +1", callback_data=f"analyze:{chain}:{address}:{depth+1}")
+                    ]
+                ]
+                
+                if analysis.get('is_token'):
+                    keyboard.append([
+                        InlineKeyboardButton("💰 Buy", callback_data=f"buy:preview:{chain}:{address}"),
+                        InlineKeyboardButton("📈 Price Chart", callback_data=f"chart:{chain}:{address}")
+                    ])
+                
+                # Send final analysis
+                await status_message.edit_text(
+                    msg,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+                
+                logger.info(f"Analysis completed for {address} on {chain}")
+                
+            except Exception as e:
+                logger.error(f"Analysis process failed: {e}")
+                await status_message.edit_text(
+                    "❌ Analysis failed.\n"
+                    "This could be due to:\n"
+                    "• Invalid address\n"
+                    "• Network issues\n"
+                    "• API limits\n\n"
+                    "Please try again in a few minutes."
+                )
+                
+        except ValueError as e:
+            await update.message.reply_text(f"❌ Invalid input: {str(e)}")
+        except Exception as e:
+            logger.error(f"Analyze command error: {e}")
             await update.message.reply_text(
-                analysis_text,
-                reply_markup=keyboard,
-                parse_mode='Markdown'
+                "❌ An error occurred while processing your request.\n"
+                "Please try again later."
             )
             
         except Exception as e:
