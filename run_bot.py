@@ -9,6 +9,7 @@ import logging
 import sys
 import os
 from pathlib import Path
+from telegram.error import Conflict, NetworkError
 
 # Add the project root to Python path
 project_root = Path(__file__).parent
@@ -25,6 +26,19 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+async def error_handler(update, context):
+    """Handle errors in the Telegram bot"""
+    logger.error(f"Update {update} caused error: {context.error}")
+    
+    if isinstance(context.error, Conflict):
+        logger.error("Another bot instance is already running. Please stop it first.")
+        await context.application.stop()
+        sys.exit(1)
+    elif isinstance(context.error, NetworkError):
+        logger.error("Network error occurred. Please check your connection.")
+    else:
+        logger.error(f"An unexpected error occurred: {context.error}")
 
 def main():
     """Main startup function"""
@@ -74,10 +88,13 @@ def main():
         commands = get_bot_commands()
         
         # Import telegram components
-        from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+        from telegram.ext import Application, CommandHandler
         
         # Create application
         application = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
+        
+        # Add error handler
+        application.add_error_handler(error_handler)
         
         # Wire basic commands available now
         application.add_handler(CommandHandler("scan", commands.scan_command))
@@ -121,8 +138,9 @@ def main():
         application.add_handler(CommandHandler("start", _start))
         application.add_handler(CommandHandler("help", _help))
         
-        # Wire inline button callbacks from commands
-        application.add_handler(CallbackQueryHandler(commands.callback_handler))
+        # Register new modular callback handlers
+        from bot.callbacks import register_handlers
+        register_handlers(application)
 
         # Set Telegram command menu via async post_init hook
         from telegram import BotCommand
@@ -169,7 +187,7 @@ def main():
             asyncio.set_event_loop(loop)
 
         # Start the bot using PTB's built-in runner
-        application.run_polling()
+        application.run_polling(allowed_updates=['message', 'callback_query', 'my_chat_member'])
         
     except ImportError as e:
         logger.error(f"Import error: {e}")

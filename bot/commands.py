@@ -13,8 +13,24 @@ from config import Config
 from db.models import get_db_manager
 from monitor.scanner import get_discovery_scanner
 from utils.formatting import AddressFormatter
+from utils.key_manager import key_manager
+from utils.cache import cache
+import os
 
 logger = logging.getLogger(__name__)
+
+SAFE_MODE = os.getenv("SAFE_MODE", "true").lower() == "true"
+ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "639088027"))
+
+# Global bot commands instance
+_bot_commands = None
+
+def get_bot_commands():
+    """Get the singleton bot commands instance"""
+    global _bot_commands
+    if _bot_commands is None:
+        _bot_commands = BotCommands()
+    return _bot_commands
 
 class BotCommands:
     """Telegram bot command handlers"""
@@ -29,6 +45,10 @@ class BotCommands:
             self.scanner = await get_discovery_scanner()
         return self.scanner
     
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /start command"""
+        await update.message.reply_text("Welcome to Meme Trader V4 Pro! Use /scan to discover top wallets.")
+
     async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         /scan command - DISCOVERY engine
@@ -69,10 +89,10 @@ class BotCommands:
             await update.message.reply_text("❌ Scan failed. Please try again later.")
     
     def _format_scan_results(self, wallets: List) -> str:
-        """Format scan results exactly as specified in requirements"""
+        """Format scan results, only showing wallets with avg ROI >= 200x"""
         if not wallets:
-            return "No wallets found."
-        
+            return "No wallets found with avg ROI >= 200x."
+
         # Group by chain
         chains = {}
         for wallet in wallets:
@@ -80,18 +100,18 @@ class BotCommands:
             if chain not in chains:
                 chains[chain] = []
             chains[chain].append(wallet)
-        
-        message_parts = []
-        
+
+        message_parts = ["*Only wallets with average ROI >= 200x are shown.*\n"]
+
         for chain_name, chain_wallets in chains.items():
             # Chain header
             message_parts.append(f"**Top Traders ({chain_name.title()})**\n")
-            
+
             # Wallet entries
             for i, wallet in enumerate(chain_wallets):
                 # Format address with short display
                 short_addr = f"{wallet.address[:6]}...{wallet.address[-4:]}"
-                
+
                 # Format metrics exactly as specified
                 wallet_entry = (
                     f"{i+1}. {short_addr} (Score {wallet.score:.0f}/100)\n"
@@ -99,11 +119,11 @@ class BotCommands:
                     f"Avg ROI {wallet.avg_roi:.1f}x | Volume ${wallet.volume_usd:,.0f} | "
                     f"{wallet.recent_activity} trades last 30d\n"
                 )
-                
+
                 message_parts.append(wallet_entry)
-            
+
             message_parts.append("")  # Empty line between chains
-        
+
         return "\n".join(message_parts)
     
     def _create_scan_keyboard(self, wallets: List) -> InlineKeyboardMarkup:
@@ -558,25 +578,24 @@ class BotCommands:
     def _create_watchlist_keyboard(self, watchlist: List[Dict]) -> InlineKeyboardMarkup:
         """Create inline keyboard for watchlist items"""
         keyboard = []
-        
         for i, item in enumerate(watchlist):
-            # Use shortened callback data to avoid 64-byte limit
+            chain = item['chain']
+            address = item['address']
             row = [
                 InlineKeyboardButton(
-                    "🔍 Analyze", 
-                    callback_data=f"w_a_{i}"
+                    "🔍 Analyze",
+                    callback_data=f"analyze:{chain}:{address}"
                 ),
                 InlineKeyboardButton(
-                    "🗑 Remove", 
+                    "🗑 Remove",
                     callback_data=f"w_r_{i}"
                 ),
                 InlineKeyboardButton(
-                    "📋 Copy", 
+                    "📋 Copy",
                     callback_data=f"w_c_{i}"
                 )
             ]
             keyboard.append(row)
-        
         return InlineKeyboardMarkup(keyboard)
     
     async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1223,9 +1242,157 @@ class BotCommands:
             logger.error(f"Mnemonic callback error: {e}")
             await query.edit_message_text("❌ Mnemonic action failed. Please try again.")
 
-# Global commands instance
-bot_commands = BotCommands()
+    async def settings_command(self, update, context):
+        """
+        /settings <action> [key] [value]
+        Actions: get, set, delete, list
+        """
+        try:
+            user_id = update.effective_user.id
+            args = context.args
+            db = self.db
+            if not args:
+                await update.message.reply_text(
+                    "Usage: /settings <get|set|delete|list> [key] [value]"
+                )
+                return
+            action = args[0].lower()
+            if action == "get" and len(args) > 1:
+                key = args[1]
+                value = db.get_user_setting(user_id, key)
+                await update.message.reply_text(
+                    f"Setting '{key}': {value if value is not None else 'Not set'}"
+                )
+            elif action == "set" and len(args) > 2:
+                key = args[1]
+                value = args[2]
+                success = db.set_user_setting(user_id, key, value)
+                await update.message.reply_text(
+                    f"Set '{key}' to '{value}'" if success else "Failed to set setting."
+                )
+            elif action == "delete" and len(args) > 1:
+                key = args[1]
+                success = db.set_user_setting(user_id, key, "")
+                await update.message.reply_text(
+                    f"Deleted setting '{key}'" if success else "Failed to delete setting."
+                )
+            elif action == "list":
+                # List all settings for user
+                import sqlite3
+                with sqlite3.connect(db.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT key, value FROM user_settings WHERE user_id = ?", (user_id,)
+                    )
+                    rows = cursor.fetchall()
+                    if not rows:
+                        await update.message.reply_text("No settings found.")
+                        return
+                    msg = "\n".join([f"{k}: {v}" for k, v in rows])
+                    await update.message.reply_text(f"Your settings:\n{msg}")
+            else:
+                await update.message.reply_text(
+                    "Invalid usage. /settings <get|set|delete|list> [key] [value]"
+                )
+        except Exception as e:
+            logger.error(f"Settings command failed: {e}")
+            await update.message.reply_text("Settings command failed. Please try again.")
 
-def get_bot_commands() -> BotCommands:
-    """Get bot commands instance"""
-    return bot_commands
+    async def balance_command(self, update, context):
+        """
+        /balance [address] [chain]
+        Shows wallet balance and top token holdings
+        """
+        try:
+            args = context.args
+            if not args:
+                await update.message.reply_text("Usage: /balance <address> [chain]")
+                return
+            address = args[0]
+            chain = args[1] if len(args) > 1 else "ethereum"
+            from utils.bot_helpers import get_wallet_balance
+            balance = await get_wallet_balance(address, chain)
+            msg = f"\U0001F4B0 Balance for {address[:6]}...{address[-4:]} ({chain.upper()}):\n"
+            msg += f"Native: {balance['native_balance']:.4f} {balance['native_symbol']} (${balance['usd_value']:.2f})\n"
+            if balance['tokens']:
+                msg += "\nTop Tokens:\n"
+                for t in balance['tokens']:
+                    msg += f"- {t['symbol']}: {t['balance']:.4f} (${t['usd_value']:.2f})\n"
+            else:
+                msg += "No token holdings found."
+            await update.message.reply_text(msg)
+        except Exception as e:
+            logger.error(f"Balance command failed: {e}")
+            await update.message.reply_text("Balance command failed. Please try again.")
+
+    async def address_command(self, update, context):
+        """
+        /address
+        Shows your configured wallet addresses (ETH, BSC, SOL)
+        """
+        try:
+            from core.secure_wallet import get_secure_wallet
+            secure_wallet = get_secure_wallet()
+            status = secure_wallet.get_wallet_status()
+            if not status['configured']:
+                await update.message.reply_text("No wallet configured. Use /mnemonic to set up.")
+                return
+            msg = "\U0001F511 Your Wallet Addresses:\n"
+            msg += f"ETH: `{status.get('addresses', {}).get('ethereum', 'N/A')}`\n"
+            msg += f"BSC: `{status.get('addresses', {}).get('bsc', 'N/A')}`\n"
+            msg += f"SOL: `{status.get('addresses', {}).get('solana', 'N/A')}`\n"
+            await update.message.reply_text(msg, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Address command failed: {e}")
+            await update.message.reply_text("Address command failed. Please try again.")
+
+    async def admin_command(self, update, context):
+        """
+        /admin <action> [args]
+        Admin-only commands: users, diagnostics, reload, dbstats
+        """
+        try:
+            user_id = update.effective_user.id
+            if user_id != ADMIN_TELEGRAM_ID:
+                await update.message.reply_text("Unauthorized. Admin only.")
+                return
+            args = context.args
+            db = self.db
+            if not args:
+                await update.message.reply_text("Usage: /admin <users|diagnostics|reload|dbstats>")
+                return
+            action = args[0].lower()
+            if action == "users":
+                # List all users with watchlist entries
+                users = db.get_all_watchlist_users()
+                msg = f"Users with watchlists: {', '.join(users) if users else 'None'}"
+                await update.message.reply_text(msg)
+            elif action == "diagnostics":
+                # Show bot diagnostics
+                import platform, os
+                msg = f"Diagnostics:\nPython: {platform.python_version()}\nOS: {platform.system()} {platform.release()}\nUptime: {os.times().elapsed:.2f}s"
+                await update.message.reply_text(msg)
+            elif action == "reload":
+                # Reload config (demo)
+                from importlib import reload
+                import config
+                reload(config)
+                await update.message.reply_text("Config reloaded.")
+            elif action == "dbstats":
+                # Show DB stats
+                import sqlite3
+                with sqlite3.connect(db.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM watchlist")
+                    watchlist_count = cursor.fetchone()[0]
+                    cursor.execute("SELECT COUNT(*) FROM wallets")
+                    wallet_count = cursor.fetchone()[0]
+                    cursor.execute("SELECT COUNT(*) FROM trades")
+                    trade_count = cursor.fetchone()[0]
+                msg = f"DB Stats:\nWatchlist: {watchlist_count}\nWallets: {wallet_count}\nTrades: {trade_count}"
+                await update.message.reply_text(msg)
+            else:
+                await update.message.reply_text("Unknown admin action.")
+        except Exception as e:
+            logger.error(f"Admin command failed: {e}")
+            await update.message.reply_text("Admin command failed. Please try again.")

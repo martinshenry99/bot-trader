@@ -15,6 +15,8 @@ from services.helius import get_helius_client
 from services.go_plus import get_goplus_client
 from services.mock_data import get_mock_provider
 from utils.key_manager import get_key_manager
+from services.insider_detector import InsiderDetector
+from utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,7 @@ class DiscoveryScanner:
         self.db = get_db_manager()
         self.key_manager = get_key_manager()
         self.mock_provider = get_mock_provider()
+        self.insider_detector = InsiderDetector()
         self.cache = {}
         self.cache_ttl = Config.CACHE_TTL_SECONDS
         self.min_score = Config.SCAN_MIN_SCORE
@@ -121,16 +124,18 @@ class DiscoveryScanner:
             qualified_wallets = [w for w in graph_analyzed if w.score >= self.min_score]
             logger.info(f"Qualified wallets (score >= {self.min_score}): {len(qualified_wallets)}")
             
-            # Step 6: Sort by score and return top N
-            qualified_wallets.sort(key=lambda x: x.score, reverse=True)
-            top_wallets = qualified_wallets[:limit]
-            
+            # Step 6: Filter by avg ROI >= 200x, sort by score, and return top N
+            roi_filtered_wallets = [w for w in qualified_wallets if w.avg_roi >= 200]
+            logger.info(f"Wallets with avg ROI >= 200x: {len(roi_filtered_wallets)}")
+            roi_filtered_wallets.sort(key=lambda x: x.score, reverse=True)
+            top_wallets = roi_filtered_wallets[:limit]
+
             # Save discovered wallets to database
             await self._save_discovered_wallets(top_wallets)
-            
+
             scan_time = datetime.now() - start_time
-            logger.info(f"Discovery scan completed in {scan_time.total_seconds():.2f}s. Found {len(top_wallets)} qualified wallets")
-            
+            logger.info(f"Discovery scan completed in {scan_time.total_seconds():.2f}s. Found {len(top_wallets)} qualified wallets (ROI >= 200x)")
+
             return top_wallets
             
         except Exception as e:
@@ -579,4 +584,4 @@ discovery_scanner = DiscoveryScanner()
 
 async def get_discovery_scanner() -> DiscoveryScanner:
     """Get discovery scanner instance"""
-    return discovery_scanner 
+    return discovery_scanner

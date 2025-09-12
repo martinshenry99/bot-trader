@@ -9,10 +9,19 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     
     # API Keys - REQUIRED for core functionality
+    # Legacy single key support
     COVALENT_API_KEY = os.getenv('COVALENT_API_KEY')
-    ZEROX_API_KEY = os.getenv('ZEROX_API_KEY')
+    ZEROX_API_KEY = os.getenv('ZEROX_KEYS')  # Use rotation keys as primary
     GOPLUS_API_KEY = os.getenv('GOPLUS_API_KEY') 
     COINGECKO_API_KEY = os.getenv('COINGECKO_API_KEY')
+    
+    # API Key Rotation Pools
+    COVALENT_KEYS = os.getenv('COVALENT_KEYS', '').split(',')
+    ZEROX_KEYS = os.getenv('ZEROX_KEYS', '').split(',')
+    GOPLUS_KEYS = os.getenv('GOPLUS_KEYS', '').split(',')
+    COINGECKO_KEYS = os.getenv('COINGECKO_KEYS', '').split(',')
+    HELIUS_KEYS = os.getenv('HELIUS_KEYS', '').split(',')
+    JUPITER_KEYS = os.getenv('JUPITER_KEYS', '').split(',')
     
     # Ethereum Mainnet Configuration
     ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL', 'https://eth.llamarpc.com')
@@ -31,15 +40,15 @@ class Config:
     # Solana Mainnet Configuration
     SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
     SOLANA_NETWORK = os.getenv('SOLANA_NETWORK', 'mainnet-beta')
-    HELIUS_API_URL = os.getenv('HELIUS_API_URL', 'https://api.helius.xyz/v0')
+    HELIUS_API_URL = os.getenv('HELIUS_API_URL', 'https://mainnet.helius-rpc.com')
     
     # 0x Protocol APIs - Mainnet
     ZEROEX_ETH_API = os.getenv('ZEROEX_ETH_API', 'https://api.0x.org')
     ZEROEX_BSC_API = os.getenv('ZEROEX_BSC_API', 'https://bsc.api.0x.org')
     
     # Jupiter/Solana Configuration - Mainnet
-    JUPITER_API_URL = os.getenv('JUPITER_API_URL', 'https://quote-api.jup.ag/v6')
-    JUPITER_PRICE_API = os.getenv('JUPITER_PRICE_API', 'https://api.jup.ag/price/v2')
+    JUPITER_API_URL = os.getenv('JUPITER_API_URL', 'https://quote-api.jup.ag/v4/quote')
+    JUPITER_PRICE_API = os.getenv('JUPITER_PRICE_API', 'https://price.jup.ag/v4')
     
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///meme_trader.db')

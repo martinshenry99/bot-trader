@@ -13,7 +13,7 @@ class APIClient:
         self.session = None
 
     async def get_session(self):
-        if not self.session:
+        if not self.session or self.session.closed:
             self.session = aiohttp.ClientSession()
         return self.session
 
@@ -24,13 +24,13 @@ class APIClient:
     async def get(self, url: str, params: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
         """Make GET request"""
         try:
-            session = await self.get_session()
-            async with session.get(url, params=params) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    logger.error(f"API request failed: {response.status}")
-                    return None
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        logger.error(f"API request failed: {response.status}")
+                        return None
         except Exception as e:
             logger.error(f"API request error: {e}")
             return None
@@ -38,13 +38,13 @@ class APIClient:
     async def post(self, url: str, data: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
         """Make POST request"""
         try:
-            session = await self.get_session()
-            async with session.post(url, json=data) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    logger.error(f"API request failed: {response.status}")
-                    return None
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=data) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        logger.error(f"API request failed: {response.status}")
+                        return None
         except Exception as e:
             logger.error(f"API request error: {e}")
             return None
@@ -63,12 +63,11 @@ class CovalentAPI:
     async def get_session(self):
         """Get or create aiohttp session with rotated API key"""
         from utils.key_manager import key_manager
-        
         if self.session is None or self.session.closed:
             api_key = await key_manager.get_key('covalent')
             if not api_key:
                 raise Exception("No Covalent API keys available")
-                
+            # Use async with for session management if possible
             self.session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=Config.REQUEST_TIMEOUT),
                 headers={'Authorization': f'Bearer {api_key}'}

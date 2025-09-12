@@ -415,9 +415,26 @@ class WatchlistMonitor:
     
     async def _send_alert_to_user(self, user_id: str, message: str, alert: TradeAlert):
         """Send alert to specific user with inline buttons"""
-        # This would integrate with the bot to send the message
-        # For now, just log it
-        logger.info(f"Sending alert to user {user_id}: {message}")
+        try:
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            # Actionable buttons: Analyze Token, Buy, Blacklist, Copy Contract
+            keyboard = []
+            if alert:
+                keyboard.append([
+                    InlineKeyboardButton("Analyze Token", callback_data=f"buy_analyze_{alert.token_address}_{alert.chain}"),
+                    InlineKeyboardButton("Buy", callback_data=f"buy_quick_{alert.token_address}_50_{alert.chain}")
+                ])
+                keyboard.append([
+                    InlineKeyboardButton("Blacklist Token", callback_data=f"blacklist_token_{alert.token_address}"),
+                    InlineKeyboardButton("Copy Contract", callback_data=f"copy_address_{alert.token_address}")
+                ])
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            # Integrate with bot to send message (replace with actual send logic)
+            # For demo, just log
+            logger.info(f"Sending alert to user {user_id}: {message}")
+            # Example: await bot.send_message(user_id, message, reply_markup=reply_markup, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Failed to send alert to user {user_id}: {e}")
     
     async def _consensus_detector(self):
         """Detect consensus buys (multiple wallets buying same token)"""

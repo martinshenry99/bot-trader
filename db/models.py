@@ -3,17 +3,19 @@ Database Models for Meme Trader V4 Pro
 Exact schema as specified in requirements
 """
 
-import sqlite3
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
+import sqlite3
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
 # Database path
 DB_PATH = Path("meme_trader.db")
+
 
 @dataclass
 class WalletData:
@@ -87,6 +89,11 @@ class TradeAlertData:
     is_safe: bool
     consensus_boost: bool
     created_at: datetime
+
+# DB setup helpers
+
+# No SQLAlchemy ORM setup required; all DB operations use direct SQLite
+
 
 class DatabaseManager:
     """Database manager for Meme Trader V4 Pro"""
@@ -571,4 +578,4 @@ def create_tables():
 
 def get_db_session():
     """Get database connection (for compatibility)"""
-    return sqlite3.connect(db_manager.db_path) 
+    return sqlite3.connect(db_manager.db_path)

@@ -1,4 +1,3 @@
-
 """
 Bot helper functions for database operations and utilities
 """
@@ -226,53 +225,85 @@ async def get_user_executor_wallets(user_id: int) -> List[Dict]:
 
 
 async def get_wallet_balance(address: str, chain: str) -> Dict:
-    """Get wallet balance and token holdings"""
+    """Get wallet balance and token holdings with multicall batching for EVM chains"""
     try:
-        covalent_client = CovalentClient()
-        chain_id = get_chain_id(chain)
-        
-        # Get token balances
-        balance_data = await covalent_client.get_token_balances(chain_id, address)
-        
-        native_balance = float(balance_data.get('balance', 0)) / 1e18
-        native_symbol = get_native_symbol(chain)
-        
-        # Get USD value (simplified)
-        usd_value = native_balance * 2000  # Placeholder ETH price
-        
-        # Process token holdings
-        tokens = []
-        if balance_data.get('items'):
-            for token in balance_data['items'][:10]:  # Top 10 tokens
-                if float(token.get('balance', 0)) > 0:
-                    token_balance = float(token['balance']) / (10 ** token.get('contract_decimals', 18))
-                    token_usd = float(token.get('quote', 0))
-                    
-                    if token_usd > 1:  # Only show tokens worth > $1
-                        tokens.append({
-                            'symbol': token.get('contract_ticker_symbol', 'Unknown'),
-                            'balance': token_balance,
-                            'usd_value': token_usd,
-                            'contract': token.get('contract_address')
-                        })
-        
-        # Sort tokens by USD value
-        tokens.sort(key=lambda x: x['usd_value'], reverse=True)
-        
-        return {
-            'native_balance': native_balance,
-            'native_symbol': native_symbol,
-            'usd_value': usd_value,
-            'tokens': tokens
-        }
-        
+        if chain in ["ethereum", "bsc"]:
+            from web3 import Web3
+            from web3.middleware import geth_poa_middleware
+            from eth_abi import decode_single
+            # Example RPC endpoints (should be replaced with config/env)
+            rpc_map = {
+                "ethereum": "https://rpc.ankr.com/eth",
+                "bsc": "https://rpc.ankr.com/bsc"
+            }
+            w3 = Web3(Web3.HTTPProvider(rpc_map[chain]))
+            if chain == "bsc":
+                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+            # Multicall contract address (mainnet)
+            multicall_address = {
+                "ethereum": "0x5ba1e12693dc8f9c48aad8770482f4739beed696",
+                "bsc": "0x1Ee38d535d541c55C9dae27B12edf090C608E6Fb"
+            }[chain]
+            multicall_abi = [
+                {
+                    "constant": True,
+                    "inputs": [
+                        {"components": [
+                            {"name": "target", "type": "address"},
+                            {"name": "callData", "type": "bytes"}
+                        ], "name": "calls", "type": "tuple[]"}
+                    ],
+                    "name": "aggregate",
+                    "outputs": [
+                        {"name": "blockNumber", "type": "uint256"},
+                        {"name": "returnData", "type": "bytes[]"}
+                    ],
+                    "payable": False,
+                    "stateMutability": "view",
+                    "type": "function"
+                }
+            ]
+            multicall = w3.eth.contract(address=multicall_address, abi=multicall_abi)
+            # Example: batch ERC20 balanceOf calls for top tokens
+            # For demo, use static token list
+            tokens = [
+                {"address": "0x6B175474E89094C44Da98b954EedeAC495271d0F", "symbol": "DAI", "decimals": 18},
+                {"address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "symbol": "USDC", "decimals": 6},
+                {"address": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "symbol": "USDT", "decimals": 6}
+            ]
+            calls = []
+            for token in tokens:
+                erc20_abi = ["function balanceOf(address) view returns (uint256)"]
+                contract = w3.eth.contract(address=token["address"], abi=erc20_abi)
+                call_data = contract.encodeABI(fn_name="balanceOf", args=[address])
+                calls.append((token["address"], call_data))
+            # Prepare multicall input
+            multicall_input = [{"target": c[0], "callData": bytes.fromhex(c[1][2:])} for c in calls]
+            result = multicall.functions.aggregate(multicall_input).call()
+            balances = []
+            for i, token in enumerate(tokens):
+                raw = result[1][i]
+                value = int.from_bytes(raw, "big") / (10 ** token["decimals"])
+                balances.append({"symbol": token["symbol"], "balance": value, "contract": token["address"]})
+            # Native balance
+            native_balance = w3.eth.get_balance(address) / 1e18
+            native_symbol = get_native_symbol(chain)
+            usd_value = native_balance * 2000  # Placeholder
+            return {
+                "native_balance": native_balance,
+                "native_symbol": native_symbol,
+                "usd_value": usd_value,
+                "tokens": balances
+            }
+        # ...existing code for non-EVM chains...
+        # ...existing code...
     except Exception as e:
         logger.error(f"Failed to get wallet balance: {e}")
         return {
-            'native_balance': 0,
-            'native_symbol': get_native_symbol(chain),
-            'usd_value': 0,
-            'tokens': []
+            "native_balance": 0,
+            "native_symbol": get_native_symbol(chain),
+            "usd_value": 0,
+            "tokens": []
         }
 
 

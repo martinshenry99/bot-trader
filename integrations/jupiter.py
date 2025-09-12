@@ -15,13 +15,16 @@ class JupiterClient(BaseAPIClient):
     
     def __init__(self, api_key: Optional[str] = None):
         # Jupiter API doesn't require authentication for basic usage
-        super().__init__(api_key or "", "https://quote-api.jup.ag/v6", rate_limit=100)
+        # Use base URL without version, we'll add it in endpoints
+        super().__init__(api_key or "", "https://quote-api.jup.ag", rate_limit=100)
         
     async def health_check(self) -> bool:
         """Check Jupiter API health"""
         try:
-            response = await self.make_request('GET', 'tokens')
-            return response is not None and isinstance(response, list)
+            # Test quote endpoint with USDC -> SOL
+            # Use root endpoint for health check
+            response = await self.make_request('GET', '')
+            return response is not None and 'inAmount' in response
         except Exception as e:
             logger.error(f"Jupiter health check failed: {e}")
             return False

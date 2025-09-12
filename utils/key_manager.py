@@ -1,4 +1,3 @@
-
 """
 API Key Rotation Manager for Meme Trader V4 Pro
 Supports both comma-separated and individual key formats
@@ -12,8 +11,11 @@ from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from config import Config
+from dotenv import load_dotenv
+from collections import defaultdict
 
-logger = logging.getLogger(__name__)
+load_dotenv()
+logger = logging.getLogger("key_manager")
 
 @dataclass
 class KeyInfo:
@@ -29,7 +31,10 @@ class KeyRotationManager:
     """Manages API key rotation with cooldown and fallback"""
     
     def __init__(self):
-        self.keys: Dict[str, List[KeyInfo]] = {}
+        self.services = ["covalent", "helius", "goplus", "coingecko", "zero_x", "jupiter"]
+        self.keys: Dict[str, List[KeyInfo]] = defaultdict(list)
+        self.cooldowns = defaultdict(dict)
+        self.usage = defaultdict(lambda: defaultdict(int))
         self.service_configs = {
             'covalent': {
                 'env_keys': [
@@ -67,29 +72,36 @@ class KeyRotationManager:
     def load_keys(self):
         """Load API keys from environment variables"""
         for service, config in self.service_configs.items():
-            service_keys = []
-            
+            pool = []
             # Try comma-separated format first (preferred)
-            comma_keys = self._get_comma_separated_keys(config['env_keys'])
-            if comma_keys:
-                service_keys.extend(comma_keys)
-                logger.info(f"Loaded {len(comma_keys)} {service} keys from comma-separated format")
+            csv_var = f"{service.upper()}_KEYS"
+            if os.getenv(csv_var):
+                pool += [k.strip() for k in os.getenv(csv_var, "").split(",") if k.strip()]
+                logger.info(f"Loaded {len(pool)} {service} keys from comma-separated format")
             
             # Try individual key format (fallback)
-            individual_keys = self._get_individual_keys(config['env_keys'])
-            if individual_keys:
-                service_keys.extend(individual_keys)
-                logger.info(f"Loaded {len(individual_keys)} {service} keys from individual format")
+            i = 1
+            while True:
+                key_var = f"{service.upper()}_KEY_{i}"
+                key = os.getenv(key_var)
+                if not key:
+                    break
+                pool.append(key)
+                i += 1
             
             # Try fallback keys
-            fallback_keys = self._get_fallback_keys(config['fallback_keys'])
-            if fallback_keys:
-                service_keys.extend(fallback_keys)
-                logger.info(f"Loaded {len(fallback_keys)} {service} keys from fallback format")
+            key_var = f"{service.upper()}_API_KEY"
+            key = os.getenv(key_var)
+            if key:
+                pool.append(key)
+                logger.info(f"Loaded {len(pool)} {service} keys from fallback format")
+            
+            # Deduplicate
+            pool = list(dict.fromkeys(pool))
             
             # Create KeyInfo objects
             key_infos = []
-            for key in service_keys:
+            for key in pool:
                 if key and key.strip():
                     key_hash = self._hash_key(key)
                     key_infos.append(KeyInfo(
@@ -104,106 +116,30 @@ class KeyRotationManager:
             self.keys[service] = key_infos
             logger.info(f"Total {service} keys loaded: {len(key_infos)}")
     
-    def _get_comma_separated_keys(self, env_keys: List[str]) -> List[str]:
-        """Get keys from comma-separated environment variables"""
-        keys = []
-        for env_key in env_keys:
-            if env_key.endswith('S'):  # Only check keys ending with 'S' for comma-separated
-                value = os.getenv(env_key)
-                if value:
-                    for token in value.split(','):
-                        token = token.strip()
-                        if not token:
-                            continue
-                        # Accept formats like KEY, NAME=KEY, url?...api-key=KEY
-                        if 'api-key=' in token:
-                            token = token.split('api-key=')[-1]
-                        if '=' in token:
-                            token = token.split('=')[-1]
-                        token = token.strip().strip('"').strip("'")
-                        if token:
-                            keys.append(token)
-        return keys
-    
-    def _get_individual_keys(self, env_keys: List[str]) -> List[str]:
-        """Get keys from individual environment variables"""
-        keys = []
-        for env_key in env_keys:
-            if not env_key.endswith('S'):  # Only check keys NOT ending with 'S'
-                value = os.getenv(env_key)
-                if value and value.strip():
-                    token = value.strip()
-                    if 'api-key=' in token:
-                        token = token.split('api-key=')[-1]
-                    if '=' in token:
-                        token = token.split('=')[-1]
-                    token = token.strip().strip('"').strip("'")
-                    if token:
-                        keys.append(token)
-        return keys
-    
-    def _get_fallback_keys(self, fallback_keys: List[str]) -> List[str]:
-        """Get keys from fallback environment variables"""
-        keys = []
-        for env_key in fallback_keys:
-            value = os.getenv(env_key)
-            if value and value.strip():
-                token = value.strip()
-                if 'api-key=' in token:
-                    token = token.split('api-key=')[-1]
-                if '=' in token:
-                    token = token.split('=')[-1]
-                token = token.strip().strip('"').strip("'")
-                if token:
-                    keys.append(token)
-        return keys
-    
     def _hash_key(self, key: str) -> str:
         """Create hash of API key for storage"""
         return hashlib.sha256(key.encode()).hexdigest()[:16]
     
     def get_key(self, service: str) -> Optional[str]:
         """Get next available key for service"""
-        if service not in self.keys:
-            logger.warning(f"Service {service} not configured")
-            return None
+        pool = self.keys.get(service, [])
+        now = int(time.time())
+        for idx, key in enumerate(pool):
+            cooldown_until = self.cooldowns[service].get(idx, 0)
+            if now >= cooldown_until:
+                self.usage[service][idx] += 1
+                logger.debug(f"Selected {service}:key[{idx}] (usage: {self.usage[service][idx]})")
+                return key.key
+        logger.warning(f"All {service} keys in cooldown!")
+        return None
 
-        available_keys = [k for k in self.keys[service] if k.is_active and k.cooldown_until < time.time()]
-        
-        if not available_keys:
-            logger.warning(f"No available keys for {service} - all keys in cooldown")
-            return None
-        
-        # Sort by usage count (ascending) then by last used (ascending)
-        available_keys.sort(key=lambda x: (x.usage_count, x.last_used))
-        
-        # Get the least used key
-        selected_key = available_keys[0]
-        
-        # Update usage
-        selected_key.last_used = int(time.time())
-        selected_key.usage_count += 1
-        
-        logger.debug(f"Selected {service} key: {selected_key.key[:8]}... (usage: {selected_key.usage_count})")
-        return selected_key.key
-    
-    def mark_key_cooldown(self, service: str, key: str, cooldown_seconds: int = 300):
-        """Mark key as in cooldown (rate limited)"""
-            if service not in self.keys:
-            return
-        
-        key_hash = self._hash_key(key)
-        for key_info in self.keys[service]:
-            if key_info.key_hash == key_hash:
-                key_info.cooldown_until = int(time.time()) + cooldown_seconds
-                logger.warning(f"Key {key[:8]}... for {service} marked cooldown for {cooldown_seconds}s")
-                
-                # Update database ledger
-                from db.models import get_db_manager
-                db = get_db_manager()
-                db.update_key_usage(service, key_hash, key_info.cooldown_until)
-                break
-    
+    def mark_key_cooldown(self, service, idx, base=60):
+        now = int(time.time())
+        prev = self.cooldowns[service].get(idx, 0)
+        backoff = base * (2 if prev > now else 1)
+        self.cooldowns[service][idx] = now + backoff
+        logger.warning(f"Key {service}[{idx}] marked cooldown for {backoff}s")
+
     def mark_key_exhausted(self, service: str, key: str, cooldown_seconds: int = 3600):
         """Mark key as exhausted (quota reached) - longer cooldown"""
         self.mark_key_cooldown(service, key, cooldown_seconds)

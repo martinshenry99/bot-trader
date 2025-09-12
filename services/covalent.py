@@ -1,153 +1,78 @@
-"""
-Covalent Service for Meme Trader V4 Pro
-Handles Ethereum and BSC chain data with API key rotation
-"""
 
-import aiohttp
-import asyncio
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+import asyncio
+from typing import List, Dict, Optional
 from datetime import datetime, timedelta
-from dataclasses import dataclass
-from config import Config
-from utils.key_manager import get_api_key, mark_key_rate_limited, mark_key_quota_exhausted
 
 logger = logging.getLogger(__name__)
 
-@dataclass
 class TokenTransfer:
-    """Token transfer data"""
-    tx_hash: str
-    block_height: int
-    block_signed_at: str
-    from_address: str
-    to_address: str
-    token_address: str
-    token_symbol: str
-    token_name: str
-    amount: str
-    decimals: int
-    value_usd: float
-    gas_offered: int
-    gas_spent: int
-    gas_price: int
-    fees_paid: float
-    gas_quote_rate: float
+    def __init__(self, tx_hash, block_height, block_signed_at, from_address, to_address, token_address, token_symbol, token_name, amount, decimals, value_usd, gas_offered, gas_spent, gas_price, fees_paid, gas_quote_rate):
+        self.tx_hash = tx_hash
+        self.block_height = block_height
+        self.block_signed_at = block_signed_at
+        self.from_address = from_address
+        self.to_address = to_address
+        self.token_address = token_address
+        self.token_symbol = token_symbol
+        self.token_name = token_name
+        self.amount = amount
+        self.decimals = decimals
+        self.value_usd = value_usd
+        self.gas_offered = gas_offered
+        self.gas_spent = gas_spent
+        self.gas_price = gas_price
+        self.fees_paid = fees_paid
+        self.gas_quote_rate = gas_quote_rate
 
-@dataclass
 class WalletMetrics:
-    """Wallet performance metrics"""
-    address: str
-    chain: str
-    win_rate: float
-    max_multiplier: float
-    avg_roi: float
-    total_volume_usd: float
-    trade_count: int
-    recent_activity: int
-    score: float
-    risk_flags: List[str]
+    def __init__(self, address, chain, win_rate, max_multiplier, avg_roi, total_volume_usd, trade_count, recent_activity, score, risk_flags):
+        self.address = address
+        self.chain = chain
+        self.win_rate = win_rate
+        self.max_multiplier = max_multiplier
+        self.avg_roi = avg_roi
+        self.total_volume_usd = total_volume_usd
+        self.trade_count = trade_count
+        self.recent_activity = recent_activity
+        self.score = score
+        self.risk_flags = risk_flags
 
 class CovalentClient:
-    """Covalent API client with key rotation and comprehensive wallet analysis"""
-    
     def __init__(self):
-        # Allow overriding base via env if needed
-        self.base_url = getattr(Config, 'COVALENT_API_BASE', None) or "https://api.covalenthq.com/v1"
         self.session = None
-        self.cache = {}
-        self.cache_ttl = Config.CACHE_TTL_SECONDS
-    
-    async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create aiohttp session"""
-        if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=45),
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MemeTrader/1.0',
-                    'Accept': 'application/json, text/plain, */*',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Origin': 'https://www.covalenthq.com',
-                    'Referer': 'https://www.covalenthq.com/',
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache',
-                    'Connection': 'keep-alive'
-                },
-                trust_env=True
-            )
-        return self.session
-    
-    async def _make_request(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
-        """Make API request with key rotation and error handling"""
-        max_retries = 3
+        self.base_url = "https://api.covalenthq.com/v1"
         
-        for attempt in range(max_retries):
-            try:
-                api_key = get_api_key('covalent')
-                if not api_key:
-                    logger.error("No available Covalent API keys")
-                    return None
-                
-                url = f"{self.base_url}{endpoint}"
-                if params is None:
-                    params = {}
-                # Prefer header-based auth to reduce query param blocking
-                request_headers = {'x-api-key': api_key}
-                
-                session = await self._get_session()
-                async with session.get(url, params=params, headers=request_headers) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if data.get('error') or data.get('error_code'):
-                            logger.error(f"Covalent API error: {data}")
-                            return None
-                        return data
-                    
-                    elif response.status == 429:  # Rate limited
-                        logger.warning(f"Rate limited on attempt {attempt + 1}")
-                        mark_key_rate_limited('covalent', api_key)
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                            continue
-                    
-                    elif response.status == 402:  # Quota exceeded
-                        logger.error(f"Quota exceeded for key {api_key[:8]}...")
-                        mark_key_quota_exhausted('covalent', api_key)
-                        if attempt < max_retries - 1:
-                            continue
-                    
-                    elif response.status == 403:
-                        body = await response.text()
-                        if 'Cloudflare' in body or 'blocked' in body:
-                            logger.error("Covalent request blocked by Cloudflare (HTTP 403). Consider using residential IP or proxy.")
-                        else:
-                            logger.error(f"HTTP 403: {body}")
-                        # Cooldown the key briefly and try next key if available
-                        mark_key_rate_limited('covalent', api_key)
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(1)
-                            continue
-                        return None
-                    else:
-                        logger.error(f"HTTP {response.status}: {await response.text()}")
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(1)
-                            continue
-                
-            except asyncio.TimeoutError:
-                logger.warning(f"Request timeout on attempt {attempt + 1}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(1)
-                    continue
+    async def _make_request(self, endpoint: str, params: dict = None) -> dict:
+        """Make authenticated request to Covalent API"""
+        from utils.key_manager import get_key_manager
+        import aiohttp
+        
+        if params is None:
+            params = {}
             
-            except Exception as e:
-                logger.error(f"Request error on attempt {attempt + 1}: {e}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(1)
-                    continue
+        if self.session is None:
+            self.session = aiohttp.ClientSession()
+            
+        key_manager = get_key_manager()
+        api_key = key_manager.get_current_key('covalent')
         
-        logger.error("All retry attempts failed")
-        return None
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
+        
+        url = f"{self.base_url}{endpoint}"
+        
+        try:
+            async with self.session.get(url, params=params, headers=headers) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+                return data.get('data', {})
+        except Exception as e:
+            logger.error(f"Failed to make Covalent request: {e}")
+            key_manager.rotate_key('covalent')
+            return {}
     
     async def get_recent_transactions(self, chain_id: int, limit: int = 1000) -> List[Dict]:
         """Get recent transactions for discovery scanning"""
@@ -172,8 +97,7 @@ class CovalentClient:
             logger.error(f"Failed to get recent transactions: {e}")
             return []
     
-    async def get_wallet_transactions(self, address: str, chain_id: int, 
-                                   start_block: int = None, end_block: int = None) -> List[TokenTransfer]:
+    async def get_wallet_transactions(self, address: str, chain_id: int, start_block: int = None, end_block: int = None) -> List[TokenTransfer]:
         """Get wallet transactions with comprehensive data"""
         try:
             endpoint = f"/{chain_id}/address/{address}/transactions_v3/"
@@ -181,9 +105,6 @@ class CovalentClient:
                 'page-size': 1000,
                 'no-nft-fetch': 'true'
             }
-            
-            if start_block:
-                params['start-block'] = start_block
             if end_block:
                 params['end-block'] = end_block
             
@@ -221,8 +142,7 @@ class CovalentClient:
             logger.error(f"Failed to get wallet transactions: {e}")
             return []
     
-    async def get_token_holders(self, token_address: str, chain_id: int, 
-                              page_size: int = 1000) -> List[Dict]:
+    async def get_token_holders(self, token_address: str, chain_id: int, page_size: int = 1000) -> List[Dict]:
         """Get token holders for graph analysis"""
         try:
             endpoint = f"/{chain_id}/tokens/{token_address}/token_holders_v3/"
@@ -396,9 +316,13 @@ class CovalentClient:
         if self.session and not self.session.closed:
             await self.session.close()
 
+    async def get_wallet_metrics(self, address, chain_id):
+        # Placeholder: implement API call with key rotation
+        pass
+
 # Global Covalent client instance
 covalent_client = CovalentClient()
 
 async def get_covalent_client() -> CovalentClient:
     """Get Covalent client instance"""
-    return covalent_client 
+    return covalent_client

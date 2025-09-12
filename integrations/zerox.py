@@ -24,13 +24,19 @@ class ZeroXClient(BaseAPIClient):
         
         self.chain_id = chain_id
         base_url = api_urls.get(chain_id, api_urls[1])
-        super().__init__(api_key, base_url, rate_limit=100)
+        # Use v1 base URL
+        super().__init__(api_key, f"{base_url}/v1", rate_limit=100)
         
     async def health_check(self) -> bool:
         """Check 0x API health"""
         try:
-            response = await self.make_request('GET', 'swap/v1/sources')
-            return response is not None
+            # Add API key to headers for authenticated requests
+            headers = {}
+            if self.api_key:
+                headers['0x-api-key'] = self.api_key
+            # Use a simple endpoint for health check
+            response = await self.make_request('GET', '', headers=headers)
+            return isinstance(response, dict)
         except Exception as e:
             logger.error(f"0x health check failed: {e}")
             return False

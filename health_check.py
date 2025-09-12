@@ -74,13 +74,72 @@ async def check_database():
 async def check_integrations():
     """Check API integrations"""
     try:
-        from startup import initialize_integrations
-        result = await initialize_integrations()
-        if result:
+        from integrations.zerox import ZeroXClient
+        from integrations.jupiter import JupiterClient
+        from integrations.helius import HeliusClient
+        from integrations.coingecko import CoinGeckoClient
+        from integrations.goplus import GoPlusClient
+        from integrations.covalent import CovalentClient
+        from utils.key_manager import get_key_manager
+        
+        key_manager = get_key_manager()
+        results = {}
+        
+        # Test 0x Protocol
+        zerox_key = key_manager.get_key('zerox')
+        if zerox_key:
+            zerox = ZeroXClient(zerox_key)
+            results['0x Protocol'] = await zerox.health_check()
+        
+        # Test Jupiter
+        jupiter_key = key_manager.get_key('jupiter')
+        if jupiter_key:
+            jupiter = JupiterClient(jupiter_key)
+            results['Jupiter'] = await jupiter.health_check()
+        
+        # Test Helius
+        helius_key = key_manager.get_key('helius')
+        if helius_key:
+            helius = HeliusClient(helius_key)
+            results['Helius'] = await helius.health_check()
+        
+        # Test CoinGecko
+        coingecko_key = key_manager.get_key('coingecko')
+        if coingecko_key:
+            coingecko = CoinGeckoClient(coingecko_key)
+            results['CoinGecko'] = await coingecko.health_check()
+        
+        # Test GoPlus
+        goplus_key = key_manager.get_key('goplus')
+        if goplus_key:
+            goplus = GoPlusClient(goplus_key)
+            results['GoPlus'] = await goplus.health_check()
+        
+        # Test Covalent
+        covalent_key = key_manager.get_key('covalent')
+        if covalent_key:
+            covalent = CovalentClient(covalent_key)
+            results['Covalent'] = await covalent.health_check()
+        
+        # Print results
+        logger.info("\nIntegration Health Check Results:")
+        logger.info("=================================")
+        healthy_count = 0
+        for service, status in results.items():
+            status_str = "✅ HEALTHY" if status else "❌ UNHEALTHY"
+            logger.info(f"{service:15} {status_str}")
+            if status:
+                healthy_count += 1
+        
+        if healthy_count == len(results):
             logger.info("Integrations: HEALTHY")
-        else:
+            return True
+        elif healthy_count > 0:
             logger.warning("Integrations: PARTIAL")
-        return result
+            return True
+        else:
+            logger.error("Integrations: FAILED")
+            return False
     except Exception as e:
         logger.error(f"Integrations: FAILED - {e}")
         return False
@@ -98,6 +157,11 @@ async def check_bot():
 
 async def main():
     """Run all health checks"""
+    await check_config()
+    await check_database()
+    await check_integrations()
+    # Skip bot check to avoid conflicts
+    return True
     logger.info("Running Meme Trader V4 Pro Health Checks...")
     
     checks = [

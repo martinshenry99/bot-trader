@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db import create_tables, get_db_session, User, Token
+from db.models import setup_db
 from config import Config
 
 def initialize_database():
@@ -85,5 +86,8 @@ def initialize_database():
         return False
 
 if __name__ == "__main__":
+    print("Initializing Meme Trader V4 Pro database...")
+    setup_db()
+    print("Database setup complete.")
     success = initialize_database()
     sys.exit(0 if success else 1)
