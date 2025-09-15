@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from config import Config
 from db.models import get_db_manager, WalletData
-from services.covalent import get_covalent_client, WalletMetrics
+from services.covalent import get_covalent_service, WalletMetrics
 from services.helius import get_helius_client
 from services.go_plus import get_goplus_client
 from services.mock_data import get_mock_provider
@@ -174,8 +174,8 @@ class DiscoveryScanner:
                         continue
                     
                     try:
-                        covalent_client = await get_covalent_client()
-                        recent_txs = await covalent_client.get_recent_transactions(chain_config['id'], 1000)
+                        covalent_service = await get_covalent_service()
+                        recent_txs = await covalent_service.get_recent_transactions(chain_config['id'], 1000)
                         
                         # Extract unique addresses from transactions
                         for tx in recent_txs:
@@ -277,8 +277,8 @@ class DiscoveryScanner:
                     )
                 else:
                     try:
-                        covalent_client = await get_covalent_client()
-                        metrics = await covalent_client.analyze_wallet_performance(address, chain_id)
+                        covalent_service = await get_covalent_service()
+                        metrics = await covalent_service.analyze_wallet_performance(address, chain_id)
                     except Exception as e:
                         logger.error(f"Covalent analysis failed for {address}: {e}")
                         # Use mock data as fallback
@@ -507,8 +507,8 @@ class DiscoveryScanner:
             return best_trade or {'symbol': 'PEPE', 'multiplier': 2.5}
         
         try:
-            covalent_client = await get_covalent_client()
-            transfers = await covalent_client.get_wallet_transactions(address, chain_id)
+            covalent_service = await get_covalent_service()
+            transfers = await covalent_service.get_wallet_transactions(address, chain_id)
             
             # Find the most profitable trade
             best_trade = None

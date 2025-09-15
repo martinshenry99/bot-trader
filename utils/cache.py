@@ -1,5 +1,11 @@
+"""
+Cache utility for Meme Trader V4 Pro
+"""
+
 import time
 import threading
+from functools import wraps
+from typing import Any, Dict, Optional
 
 class TTLCache:
     def __init__(self, ttl=600):
@@ -32,3 +38,21 @@ class TTLCache:
             self.cache.clear()
 
 cache = TTLCache()
+
+def cache_result(ttl: int = 300):
+    """Cache function results with TTL"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Generate cache key
+            key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            result = cache.get(key)
+            
+            if result is None:
+                result = await func(*args, **kwargs)
+                if result is not None:
+                    cache.set(key, result)
+            
+            return result
+        return wrapper
+    return decorator

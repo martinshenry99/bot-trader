@@ -8,7 +8,6 @@ from .base import BaseAPIClient
 
 logger = logging.getLogger(__name__)
 
-
 class CovalentClient(BaseAPIClient):
     """Covalent API client for blockchain data"""
     

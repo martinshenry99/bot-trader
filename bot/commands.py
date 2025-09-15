@@ -47,13 +47,47 @@ class BotCommands:
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
+        logger.info(f"/start command received from user {update.effective_user.id}")
         await update.message.reply_text("Welcome to Meme Trader V4 Pro! Use /scan to discover top wallets.")
+
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /help command"""
+        logger.info(f"/help command received from user {update.effective_user.id}")
+        help_text = (
+            "Commands:\n"
+            "\n"
+            "- /start — Initialize the bot and show a quick intro\n"
+            "- /help — Show this help menu\n"
+            "\n"
+            "Discovery & Analysis:\n"
+            "- /scan — Discover high-performing trader wallets across chains\n"
+            "- /analyze <address> [chain] — Deep-dive wallet/token analysis\n"
+            "\n"
+            "Watchlist & Monitoring:\n"
+            "- /watchlist — Manage your watchlist (add/remove/list/rename)\n"
+            "\n"
+            "Trading & Portfolio:\n"
+            "- /buy <token_address> <amount> [chain] — Execute a buy order\n"
+            "- /sell <token_address> <amount> [chain] — Execute a sell order\n"
+            "- /portfolio — Show current tracked positions and PnL\n"
+            "- /panic_sell — Market-sell tracked tokens immediately (safety checks apply)\n"
+            "\n"
+            "Wallet & Security:\n"
+            "- /balance — Show balances for your configured wallets\n"
+            "- /address — Show your current executor wallet addresses\n"
+            "- /mnemonic — Keystore management options (import/export/create)\n"
+            "\n"
+            "Settings:\n"
+            "- /settings — View and change preferences (slippage, scoring thresholds, alerts)\n"
+        )
+        await update.message.reply_text(help_text)
 
     async def scan_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         /scan command - Enhanced discovery engine with settings integration
         """
         try:
+            logger.info(f"/scan command received from user {update.effective_user.id}")
             # Send initial status
             status_message = await update.message.reply_text(
                 "🔍 Starting advanced wallet discovery...\n"

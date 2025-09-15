@@ -1,21 +1,53 @@
 """
 Database Models for Meme Trader V4 Pro
-Exact schema as specified in requirements
 """
 
 import logging
+import sqlite3
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
-import sqlite3
-import sqlite3
 
 logger = logging.getLogger(__name__)
 
 # Database path
 DB_PATH = Path("meme_trader.db")
 
+def init_db():
+    """Initialize database tables"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS api_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            status_code INTEGER NOT NULL,
+            latency REAL NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            response_data TEXT
+        )''')
+        
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api TEXT UNIQUE NOT NULL,
+            limit_value INTEGER NOT NULL,
+            window INTEGER NOT NULL,
+            current_usage INTEGER DEFAULT 0,
+            last_reset DATETIME DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS circuit_breakers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api TEXT UNIQUE NOT NULL,
+            state TEXT NOT NULL,
+            failure_count INTEGER DEFAULT 0,
+            last_failure DATETIME,
+            cooldown_period INTEGER DEFAULT 300,
+            threshold INTEGER DEFAULT 5
+        )''')
 
 @dataclass
 class WalletData:
@@ -48,6 +80,143 @@ class TradeData:
     chain: str
     tx_hash: str
     action: str
+
+@dataclass
+class APIKey:
+    """API key data structure"""
+    service: str
+    key: str
+    enabled: bool = True
+    last_used: datetime = datetime.utcnow()
+    calls_today: int = 0
+    total_calls: int = 0
+    last_error: Optional[str] = None
+    
+class DBManager:
+    """Database manager with connection pooling"""
+    
+    def __init__(self):
+        self.init_db()
+        
+    def init_db(self):
+        """Initialize database tables"""
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            
+            # Create API keys table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS api_keys (
+                    service TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    last_used TIMESTAMP,
+                    calls_today INTEGER DEFAULT 0,
+                    total_calls INTEGER DEFAULT 0,
+                    last_error TEXT,
+                    PRIMARY KEY (service, key)
+                )
+            """)
+            
+            conn.commit()
+            
+    async def get_api_keys(self, service: str) -> List[str]:
+        """Get all enabled API keys for a service"""
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT key FROM api_keys 
+                WHERE service = ? AND enabled = 1
+                ORDER BY calls_today ASC
+            """, (service,))
+            
+            return [row[0] for row in cursor.fetchall()]
+            
+    async def add_api_key(self, service: str, key: str) -> bool:
+        """Add a new API key"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO api_keys (
+                        service, key, enabled, last_used, 
+                        calls_today, total_calls
+                    ) VALUES (?, ?, 1, CURRENT_TIMESTAMP, 0, 0)
+                """, (service, key))
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error adding API key: {e}")
+            return False
+            
+    async def remove_api_key(self, service: str, key: str) -> bool:
+        """Remove an API key"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    DELETE FROM api_keys
+                    WHERE service = ? AND key = ?
+                """, (service, key))
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error removing API key: {e}")
+            return False
+            
+    async def update_key_usage(self, service: str, key: str, error: Optional[str] = None):
+        """Update API key usage stats"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE api_keys SET
+                        calls_today = calls_today + 1,
+                        total_calls = total_calls + 1,
+                        last_used = CURRENT_TIMESTAMP,
+                        last_error = ?
+                    WHERE service = ? AND key = ?
+                """, (error, service, key))
+                
+                conn.commit()
+                
+        except Exception as e:
+            logger.error(f"Error updating key usage: {e}")
+            
+    async def reset_daily_counts(self):
+        """Reset daily API call counts"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE api_keys SET calls_today = 0")
+                conn.commit()
+                
+        except Exception as e:
+            logger.error(f"Error resetting daily counts: {e}")
+            
+# Global instance
+db_manager = DBManager()
+
+@dataclass
+class LPPosition:
+    """Liquidity Pool Position data"""
+    token_address: str
+    pair_address: str
+    token_amount: float
+    other_token_amount: float
+    other_token_address: str
+    usd_value: float
+    last_updated: int  # timestamp
+    
+    @property
+    def total_tokens(self) -> float:
+        return self.token_amount + self.other_token_amount
+
+@dataclass
+class TradeData:
     amount: float
     usd_at_trade: float
     timestamp: int
@@ -437,6 +606,29 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to update key usage: {e}")
             return False
+            
+    def get_key_usage(self, service: str, key_hash: str) -> Optional[Dict[str, Any]]:
+        """Get key usage statistics"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT last_used, usage_count, cooldown_until 
+                    FROM key_ledger
+                    WHERE service = ? AND key_hash = ?
+                """, (service, key_hash))
+                
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'last_used': row[0],
+                        'usage_count': row[1],
+                        'cooldown_until': row[2]
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get key usage: {e}")
+            return None
     
     def get_available_keys(self, service: str) -> List[str]:
         """Get available (non-cooldown) keys for service"""

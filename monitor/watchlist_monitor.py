@@ -372,6 +372,7 @@ class WatchlistMonitor:
     
     async def _send_trade_alert(self, alert: TradeAlert):
         """Send trade alert to users"""
+        start_time = time.time()
         try:
             # Format alert message
             message = self._format_alert_message(alert)
@@ -386,8 +387,15 @@ class WatchlistMonitor:
             # Store alert in database
             self.db.store_trade_alert(alert)
             
+            # Record successful alert
+            latency = time.time() - start_time
+            metrics_manager.record_alert(success=True, latency=latency)
+            
         except Exception as e:
             logger.error(f"Error sending trade alert: {e}")
+            # Record failed alert
+            latency = time.time() - start_time
+            metrics_manager.record_alert(success=False, latency=latency)
     
     def _format_alert_message(self, alert: TradeAlert) -> str:
         """Format trade alert message"""

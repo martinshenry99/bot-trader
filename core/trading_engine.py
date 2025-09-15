@@ -1,11 +1,13 @@
 
 """
-Trading Engine for Meme Trader V4 Pro
+Trading Engine for Meme Trader V4 Pro with performance metrics
 """
 
 import logging
+import time
 from typing import Dict, Any, List
 from datetime import datetime
+from monitor.metrics import metrics_manager
 
 logger = logging.getLogger(__name__)
 
@@ -68,29 +70,80 @@ class TradingEngine:
     
     async def execute_buy(self, user_id: str, chain: str, token_address: str, amount_usd: float) -> Dict[str, Any]:
         """Execute buy order"""
+        start_time = time.time()
         try:
+            # Run preflight checks
+            preflight = await self.run_buy_preflight(token_address, chain, amount_usd)
+            if not preflight['can_proceed']:
+                metrics_manager.record_preflight_block(preflight['block_reasons'])
+                return {'error': 'Preflight checks failed', 'details': preflight['block_reasons']}
+            
             # Demo implementation
-            return {
+            result = {
                 'success': True,
                 'transaction_hash': '0x1234567890abcdef1234567890abcdef12345678',
                 'amount_usd': amount_usd,
                 'chain': chain,
                 'token_address': token_address
             }
+            
+            # Record successful trade metrics
+            execution_time = time.time() - start_time
+            metrics_manager.record_trade(
+                success=True,
+                trade_type='buy',
+                execution_time=execution_time,
+                slippage=preflight.get('slippage', 0.0)
+            )
+            
+            return result
+            
         except Exception as e:
+            # Record failed trade metrics
+            execution_time = time.time() - start_time
+            metrics_manager.record_trade(
+                success=False,
+                trade_type='buy',
+                execution_time=execution_time
+            )
             return {'error': str(e)}
     
     async def execute_sell(self, user_id: str, token_address: str, percentage: float) -> Dict[str, Any]:
         """Execute sell order"""
+        start_time = time.time()
         try:
+            # Get token balance and estimate value
+            balance = await self.get_token_balance(user_id, token_address)
+            if not balance:
+                return {'error': 'No balance found'}
+            
             # Demo implementation
-            return {
+            result = {
                 'success': True,
                 'transaction_hash': '0xabcdef1234567890abcdef1234567890abcdef12',
                 'percentage': percentage,
                 'token_address': token_address
             }
+            
+            # Record successful trade metrics
+            execution_time = time.time() - start_time
+            metrics_manager.record_trade(
+                success=True,
+                trade_type='sell',
+                execution_time=execution_time,
+                slippage=0.0  # Add actual slippage calculation
+            )
+            
+            return result
+            
         except Exception as e:
+            # Record failed trade metrics
+            execution_time = time.time() - start_time
+            metrics_manager.record_trade(
+                success=False,
+                trade_type='sell',
+                execution_time=execution_time
+            )
             return {'error': str(e)}
 
 # Global trading engine instance

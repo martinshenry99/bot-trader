@@ -10,7 +10,10 @@ from integrations.zerox import ZeroXClient
 from integrations.jupiter import JupiterClient
 from integrations.coingecko import CoinGeckoClient
 from integrations.goplus import GoPlusClient
-from integrations.covalent import CovalentClient
+from services.covalent import CovalentService
+from services.liquidity_monitor import LiquidityMonitor
+from handlers.lp_monitor_handler import LPMonitoringHandler
+from db.models.lp_position import LPPosition
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +65,8 @@ async def initialize_integrations():
         from utils.key_manager import get_api_key
         covalent_key = get_api_key('covalent')
         if covalent_key:
-            covalent_client = CovalentClient(covalent_key)
-            integration_manager.register_client('covalent', covalent_client)
+            covalent_service = CovalentService()
+            integration_manager.register_client('covalent', covalent_service)
             logger.info("Covalent client initialized")
         else:
             logger.warning("Covalent API key not found")
@@ -106,6 +109,17 @@ async def startup_sequence():
         if not integration_success:
             logger.error("Critical: Integration initialization failed")
             return False
+            
+        # Initialize watchlist monitor
+        from monitor.watchlist_monitor import watchlist_monitor
+        await watchlist_monitor.initialize()
+        await watchlist_monitor.start_monitoring()
+        
+        # Start webhook server if enabled
+        if Config.WEBHOOK_ENABLED:
+            from monitor.webhook_handler import start_webhook_server
+            webhook_runner = await start_webhook_server()
+            logger.info("Webhook server started")
         
         # Initialize trading engine
         from core.trading_engine import trading_engine
@@ -136,10 +150,35 @@ async def startup_sequence():
         return False
 
 
+async def shutdown_sequence():
+    """Graceful shutdown sequence"""
+    try:
+        logger.info("Initiating shutdown sequence...")
+        
+        # Stop watchlist monitor
+        from monitor.watchlist_monitor import watchlist_monitor
+        await watchlist_monitor.stop_monitoring()
+        
+        # Stop webhook server if running
+        if Config.WEBHOOK_ENABLED:
+            from monitor.webhook_handler import stop_webhook_server
+            await stop_webhook_server()
+        
+        # Close integrations
+        await integration_manager.close_all()
+        
+        logger.info("Shutdown completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+        
 def run_startup():
     """Run startup sequence synchronously"""
     return asyncio.run(startup_sequence())
 
+def run_shutdown():
+    """Run shutdown sequence synchronously"""
+    return asyncio.run(shutdown_sequence())
 
 if __name__ == "__main__":
     # Configure logging
@@ -151,6 +190,24 @@ if __name__ == "__main__":
     success = run_startup()
     if success:
         print("Startup completed successfully!")
+        
+        # Handle shutdown gracefully
+        import signal
+        def signal_handler(signum, frame):
+            print("\nInitiating graceful shutdown...")
+            run_shutdown()
+            exit(0)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # Keep running
+        try:
+            signal.pause()
+        except AttributeError:
+            # Windows doesn't have signal.pause
+            while True:
+                time.sleep(1)
     else:
         print("Startup failed!")
         exit(1)

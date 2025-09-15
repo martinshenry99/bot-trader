@@ -1,8 +1,14 @@
 
+"""
+Covalent API client implementation
+"""
+
 import logging
-import asyncio
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+from services.base_client import BaseAPIClient
+from services.api_manager import api_manager, APIError
+from services.key_manager import key_manager
 
 logger = logging.getLogger(__name__)
 
@@ -38,41 +44,33 @@ class WalletMetrics:
         self.score = score
         self.risk_flags = risk_flags
 
-class CovalentClient:
+class CovalentService(BaseAPIClient):
+    """Covalent API client for blockchain data"""
+    
     def __init__(self):
-        self.session = None
+        super().__init__("covalent")
         self.base_url = "https://api.covalenthq.com/v1"
         
+    @api_manager.rate_limit(service="covalent", max_calls=300, window_seconds=60)
     async def _make_request(self, endpoint: str, params: dict = None) -> dict:
-        """Make authenticated request to Covalent API"""
-        from utils.key_manager import get_key_manager
-        import aiohttp
-        
-        if params is None:
-            params = {}
-            
-        if self.session is None:
-            self.session = aiohttp.ClientSession()
-            
-        key_manager = get_key_manager()
-        api_key = key_manager.get_current_key('covalent')
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
-        }
-        
-        url = f"{self.base_url}{endpoint}"
-        
+        """Make authenticated request to Covalent API with error handling"""
         try:
-            async with self.session.get(url, params=params, headers=headers) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
-                return data.get('data', {})
+            api_key = await key_manager.get_key("covalent")
+            
+            if not api_key:
+                raise APIError(401, "No valid API key available for Covalent")
+                
+            url = f"{self.base_url}/{endpoint}"
+            response = await self.get(url, api_key=api_key, params=params)
+            
+            if response.get("error"):
+                raise APIError(400, response["error_message"])
+                
+            return response.get("data", {})
+            
         except Exception as e:
-            logger.error(f"Failed to make Covalent request: {e}")
-            key_manager.rotate_key('covalent')
-            return {}
+            logger.error(f"Failed to make Covalent API request: {e}")
+            raise APIError(500, str(e))
     
     async def get_recent_transactions(self, chain_id: int, limit: int = 1000) -> List[Dict]:
         """Get recent transactions for discovery scanning"""
@@ -321,8 +319,8 @@ class CovalentClient:
         pass
 
 # Global Covalent client instance
-covalent_client = CovalentClient()
+covalent_service = CovalentService()
 
-async def get_covalent_client() -> CovalentClient:
+async def get_covalent_service() -> CovalentService:
     """Get Covalent client instance"""
     return covalent_client

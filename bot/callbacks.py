@@ -477,22 +477,80 @@ async def analyze_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 def register_handlers(app: Application):
-    """Register all callback handlers"""
-    # Register all callback handlers with their patterns
+    """Register all callback handlers, including address, portfolio, balance, mnemonic, sell, buy, settings, analyze, watchlist"""
     handlers = [
-        (analyze_callback, "^analyze:"),
-        (buy_callback, "^buy:"),
-        (watchlist_callback, "^watch:"),
-        (mnemonic_callback, "^mnemonic:"),
-        (settings_callback, "^settings:")
+        (analyze_callback, r"^analyze:"),
+        (buy_callback, r"^buy:"),
+        (watchlist_callback, r"^watch:"),
+        (mnemonic_callback, r"^mnemonic:"),
+        (settings_callback, r"^settings:"),
+        (address_callback, r"^address:"),
+        (portfolio_callback, r"^portfolio:"),
+        (balance_callback, r"^balance:"),
+        (sell_callback, r"^sell:")
     ]
-    
-    # Add each handler to the application
     for handler_func, pattern in handlers:
         try:
             app.add_handler(CallbackQueryHandler(handler_func, pattern=pattern))
             logger.info(f"Registered handler for pattern: {pattern}")
         except Exception as e:
             logger.error(f"Failed to register handler for {pattern}: {e}")
-            
     logger.info(f"Successfully registered {len(handlers)} callback handlers")
+
+# --- Add missing callback handlers ---
+from telegram import Update
+from telegram.ext import ContextTypes
+
+async def address_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        # Example: address:<wallet_address>
+        data = query.data.split(":")
+        address = data[1] if len(data) > 1 else None
+        if not address:
+            await query.edit_message_text("❌ Invalid address callback.")
+            return
+        await query.edit_message_text(f"📬 Address: `{address}`", parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Address callback error: {e}")
+        await query.edit_message_text("❌ Failed to process address callback.")
+
+async def portfolio_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        # Example: portfolio:<user_id>
+        data = query.data.split(":")
+        user_id = data[1] if len(data) > 1 else None
+        # Fetch and display portfolio summary (placeholder)
+        await query.edit_message_text(f"📊 Portfolio for user: {user_id}\n(Feature coming soon)")
+    except Exception as e:
+        logger.error(f"Portfolio callback error: {e}")
+        await query.edit_message_text("❌ Failed to process portfolio callback.")
+
+async def balance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        # Example: balance:<user_id>
+        data = query.data.split(":")
+        user_id = data[1] if len(data) > 1 else None
+        # Fetch and display balance summary (placeholder)
+        await query.edit_message_text(f"💰 Balance for user: {user_id}\n(Feature coming soon)")
+    except Exception as e:
+        logger.error(f"Balance callback error: {e}")
+        await query.edit_message_text("❌ Failed to process balance callback.")
+
+async def sell_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        # Example: sell:<token_address>:<amount>
+        data = query.data.split(":")
+        token = data[1] if len(data) > 1 else None
+        amount = data[2] if len(data) > 2 else None
+        await query.edit_message_text(f"🛒 Sell {amount or '?'} of {token or '?'} (Feature coming soon)")
+    except Exception as e:
+        logger.error(f"Sell callback error: {e}")
+        await query.edit_message_text("❌ Failed to process sell callback.")

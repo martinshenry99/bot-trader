@@ -2,8 +2,40 @@
 Simple formatting utilities for Meme Trader V4 Pro
 """
 
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict, Optional, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+def format_main_menu(settings: Dict[str, Any]) -> str:
+    """Format main menu text based on user settings"""
+    safe_mode = settings.get("safe_mode", True)
+    
+    return (
+        "🤖 **Meme Trader Pro V4**\n\n"
+        "Welcome to the most advanced meme token trading bot!\n\n"
+        f"🔒 Safe Mode: {'ON' if safe_mode else 'OFF'}\n\n"
+        "Choose an option below to get started:\n\n"
+        "📊 Portfolio - View your holdings and trades\n"
+        "🔍 Scan Wallets - Monitor whale wallets\n" 
+        "📈 Buy Token - Execute buys with analysis\n"
+        "📉 Sell Token - Execute sells and take profits\n"
+        "🏆 Leaderboard - Top performing traders\n"
+        "⚙️ Settings - Configure bot behavior\n"
+        "❓ Help - Bot usage guide\n"
+        "🔐 Keys - Manage API keys"
+    )
+
+def format_error_message(error: str) -> str:
+    """Format error message with emoji and styling"""
+    return f"❌ Error: {error}\n\nPlease try again or contact support if the issue persists."
+
+def format_success_message(msg: str) -> str:
+    """Format success message with emoji"""
+    return f"✅ {msg}"
+
+def format_warning_message(msg: str) -> str:
+    """Format warning message with emoji"""
+    return f"⚠️ {msg}"
 
 
 class AddressFormatter:
@@ -218,3 +250,67 @@ def format_token_security(analysis: Dict) -> Tuple[str, InlineKeyboardMarkup]:
     except Exception as e:
         error_msg = f"❌ Security analysis formatting failed: {e}"
         return error_msg, None 
+
+def format_token_discovery(discoveries: List[Dict]) -> str:
+    """Format discovered tokens for display"""
+    lines = ["🔍 New Trading Opportunities"]
+    
+    for discovery in discoveries:
+        lines.extend([
+            "",
+            f"Token: {discovery['name']} ({discovery['symbol']})",
+            f"Address: {discovery['token_address']}",
+            f"Chain: {discovery['chain']}",
+            f"Liquidity: ${discovery['liquidity']:,.2f}",
+            f"24h Volume: ${discovery['volume_24h']:,.2f}",
+            f"Holders: {discovery['holder_count']:,}",
+            f"Risk Score: {discovery['risk_score']:.2f}",
+            f"Discovered: {discovery['discovery_time']}"
+        ])
+        
+        # Add risk factors if available
+        if 'risk_factors' in discovery['analysis']:
+            lines.append("Risk Factors:")
+            for factor, score in discovery['analysis']['risk_factors'].items():
+                lines.append(f"  • {factor}: {score:.2f}")
+    
+    return "\n".join(lines)
+
+def format_monitoring_alert(alerts: List[Dict]) -> str:
+    """Format monitoring alerts for display"""
+    lines = ["⚠️ Token Monitoring Alerts"]
+    
+    for alert in alerts:
+        lines.extend([
+            "",
+            f"Token: {alert['token_address']}",
+            f"Chain: {alert['chain']}",
+            f"Time: {alert['timestamp']}",
+            "Changes Detected:"
+        ])
+        
+        for change in alert['changes']:
+            lines.append(f"  • {change}")
+        
+        # Add current metrics
+        lines.extend([
+            "Current Metrics:",
+            f"  • Price: ${alert['current_data']['price_usd']:,.6f}",
+            f"  • Liquidity: ${alert['current_data']['liquidity']:,.2f}",
+            f"  • 24h Volume: ${alert['current_data']['volume_24h']:,.2f}",
+            f"  • Risk Score: {alert['current_data']['risk_score']:.2f}"
+        ])
+    
+    return "\n".join(lines)
+
+def format_watchlist(tokens: List[str]) -> str:
+    """Format watchlist tokens for display"""
+    if not tokens:
+        return "No tokens in watchlist"
+    
+    lines = ["📋 Token Watchlist"]
+    
+    for token in sorted(tokens):
+        lines.append(f"• {token}")
+    
+    return "\n".join(lines)

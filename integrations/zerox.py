@@ -1,17 +1,46 @@
 """
-0x Protocol integration for Ethereum and BSC token swaps
+0x Protocol integration for Ethereum and BSC token swaps with enhanced monitoring
 """
 
 import asyncio
 import logging
+from decimal import Decimal
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 from .base import BaseAPIClient
+from monitor.enhanced_api_monitor import EnhancedAPIMonitor
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class PriceData:
+    """0x price quote data"""
+    base_token: str
+    quote_token: str
+    price: Decimal
+    gas_price: Decimal
+    gas_amount: int
+    value: Decimal
+    allowance_target: Optional[str]
+    sources: List[Dict[str, Any]]
+
+@dataclass
+class QuoteData:
+    """0x swap quote data"""
+    price: Decimal
+    guaranteed_price: Decimal
+    to: str
+    data: str
+    value: Decimal
+    gas: int
+    estimated_gas: int
+    gas_price: Decimal
+    protocol_fee: Decimal
+    min_output_amount: Decimal
+    sources: List[Dict[str, Any]]
 
 class ZeroXClient(BaseAPIClient):
-    """0x Protocol API client for token swaps"""
+    """0x Protocol API client with enhanced monitoring"""
     
     def __init__(self, api_key: str, chain_id: int = 1):
         # Map chain IDs to 0x API endpoints
@@ -19,19 +48,169 @@ class ZeroXClient(BaseAPIClient):
             1: "https://api.0x.org",      # Ethereum mainnet
             11155111: "https://sepolia.api.0x.org",  # Sepolia testnet
             56: "https://bsc.api.0x.org",  # BSC mainnet
-            97: "https://bsc.api.0x.org"   # BSC testnet
+            97: "https://bsc-testnet.api.0x.org"  # BSC testnet
         }
         
-        self.chain_id = chain_id
         base_url = api_urls.get(chain_id, api_urls[1])
-        # Use v1 base URL
-        super().__init__(api_key, f"{base_url}/v1", rate_limit=100)
+        super().__init__(api_key, base_url, rate_limit=50)
+        self.monitor = EnhancedAPIMonitor()
+        self.chain_id = chain_id
+        self.default_chain = chain_id
         
-    async def health_check(self) -> bool:
-        """Check 0x API health"""
+    async def _monitored_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Make API request with monitoring"""
+        start_time = asyncio.get_event_loop().time()
+        
         try:
-            # Add API key to headers for authenticated requests
-            headers = {}
+            if not await self.monitor.can_make_request("zerox"):
+                raise Exception("Circuit breaker is open")
+                
+            response = await self.make_request(method, endpoint, **kwargs)
+            latency = asyncio.get_event_loop().time() - start_time
+            
+            self.monitor.track_request(
+                api="zerox",
+                endpoint=endpoint,
+                status_code=200,
+                latency=latency,
+                response_data=response
+            )
+            
+            return response
+                
+        except Exception as e:
+            latency = asyncio.get_event_loop().time() - start_time
+            self.monitor.track_request(
+                api="zerox",
+                endpoint=endpoint,
+                status_code=500,
+                latency=latency
+            )
+            raise
+            
+    async def get_price(
+        self,
+        sell_token: str,
+        buy_token: str,
+        sell_amount: Optional[int] = None,
+        buy_amount: Optional[int] = None,
+        chain_id: Optional[int] = None
+    ) -> Optional[PriceData]:
+        """Get price quote from 0x API"""
+        try:
+            params = {
+                "sellToken": sell_token,
+                "buyToken": buy_token,
+            }
+            
+            if sell_amount:
+                params["sellAmount"] = str(sell_amount)
+            if buy_amount:
+                params["buyAmount"] = str(buy_amount)
+            if chain_id:
+                params["chainId"] = chain_id
+                
+            data = await self._monitored_request(
+                "GET",
+                "/swap/v1/price",
+                params=params
+            )
+            
+            return PriceData(
+                base_token=sell_token,
+                quote_token=buy_token,
+                price=Decimal(data["price"]),
+                gas_price=Decimal(data["gasPrice"]),
+                gas_amount=int(data["estimatedGas"]),
+                value=Decimal(data.get("value", "0")),
+                allowance_target=data.get("allowanceTarget"),
+                sources=data.get("sources", [])
+            )
+            
+        except Exception as e:
+            logger.error(f"Error getting 0x price: {e}")
+            return None
+            
+    async def get_quote(
+        self,
+        sell_token: str,
+        buy_token: str,
+        sell_amount: Optional[int] = None,
+        buy_amount: Optional[int] = None,
+        slippage: float = 0.01,
+        chain_id: Optional[int] = None
+    ) -> Optional[QuoteData]:
+        """Get swap quote from 0x API"""
+        try:
+            params = {
+                "sellToken": sell_token,
+                "buyToken": buy_token,
+                "slippagePercentage": str(slippage),
+            }
+            
+            if sell_amount:
+                params["sellAmount"] = str(sell_amount)
+            if buy_amount:
+                params["buyAmount"] = str(buy_amount)
+            if chain_id:
+                params["chainId"] = chain_id
+                
+            data = await self._monitored_request(
+                "GET",
+                "/swap/v1/quote",
+                params=params
+            )
+            
+            return QuoteData(
+                price=Decimal(data["price"]),
+                guaranteed_price=Decimal(data["guaranteedPrice"]),
+                to=data["to"],
+                data=data["data"],
+                value=Decimal(data.get("value", "0")),
+                gas=int(data["gas"]),
+                estimated_gas=int(data["estimatedGas"]),
+                gas_price=Decimal(data["gasPrice"]),
+                protocol_fee=Decimal(data.get("protocolFee", "0")),
+                min_output_amount=Decimal(data.get("minimumOutputAmount", "0")),
+                sources=data.get("sources", [])
+            )
+            
+        except Exception as e:
+            logger.error(f"Error getting 0x quote: {e}")
+            return None
+            
+    async def get_supported_tokens(self) -> List[Dict[str, Any]]:
+        """Get list of tokens supported by 0x"""
+        try:
+            data = await self._monitored_request("GET", "/swap/v1/tokens")
+            return data["records"]
+        except Exception as e:
+            logger.error(f"Error getting supported tokens: {e}")
+            return []
+            
+    async def get_sources(self) -> List[Dict[str, Any]]:
+        """Get available liquidity sources"""
+        try:
+            return await self._monitored_request("GET", "/swap/v1/sources")
+        except Exception as e:
+            logger.error(f"Error getting sources: {e}")
+            return []
+            
+    async def health_check(self) -> bool:
+        """Check if 0x API is healthy"""
+        try:
+            response = await self._monitored_request("GET", "/healthcheck")
+            return response.get("success", False)
+        except Exception as e:
+            logger.error(f"0x health check failed: {e}")
+            return False
+
+    async def verify_api_key(self) -> bool:
+        """Verify if the API key is valid"""
+        try:
+            headers = {
+                "0x-api-key": self.api_key
+            }
             if self.api_key:
                 headers['0x-api-key'] = self.api_key
             # Use a simple endpoint for health check

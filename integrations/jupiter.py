@@ -1,38 +1,83 @@
 """
-Jupiter API integration for Solana token swaps
+Jupiter API integration for Solana token swaps with enhanced monitoring
 """
 
 import base64
 import logging
+import aiohttp
+import asyncio
+from decimal import Decimal
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 from .base import BaseAPIClient
+from monitor.enhanced_api_monitor import EnhancedAPIMonitor
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class QuoteData:
+    """Jupiter quote data"""
+    input_mint: str
+    output_mint: str
+    in_amount: Decimal
+    out_amount: Decimal
+    price_impact: Decimal
+    platform_fee: Decimal
+    route_plan: List[Dict[str, Any]]
 
-class JupiterClient(BaseAPIClient):
-    """Jupiter API client for Solana token swaps"""
+
+class JupiterAPI(BaseAPIClient):
+    """Jupiter API client for Solana token swaps with enhanced monitoring"""
     
     def __init__(self, api_key: Optional[str] = None):
         # Jupiter API doesn't require authentication for basic usage
-        # Use base URL without version, we'll add it in endpoints
-        super().__init__(api_key or "", "https://quote-api.jup.ag", rate_limit=100)
+        super().__init__(api_key or "", "https://quote-api.jup.ag/v6", rate_limit=100)
+        self.monitor = EnhancedAPIMonitor()
         
-    async def health_check(self) -> bool:
-        """Check Jupiter API health"""
+    async def _monitored_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Make API request with monitoring"""
+        start_time = asyncio.get_event_loop().time()
+        
         try:
-            # Test quote endpoint with USDC -> SOL
-            # Use root endpoint for health check
-            response = await self.make_request('GET', '')
-            return response is not None and 'inAmount' in response
+            if not await self.monitor.can_make_request("jupiter"):
+                raise Exception("Circuit breaker is open")
+                
+            response = await self.make_request(method, endpoint, **kwargs)
+            latency = asyncio.get_event_loop().time() - start_time
+            
+            self.monitor.track_request(
+                api="jupiter",
+                endpoint=endpoint,
+                status_code=200,
+                latency=latency,
+                response_data=response
+            )
+            
+            return response
+                
+        except Exception as e:
+            latency = asyncio.get_event_loop().time() - start_time
+            self.monitor.track_request(
+                api="jupiter",
+                endpoint=endpoint,
+                status_code=500,
+                latency=latency
+            )
+            raise
+            
+    async def health_check(self) -> bool:
+        """Check Jupiter API health with monitoring"""
+        try:
+            response = await self._monitored_request('GET', 'health')
+            return response.get('status') == 'ok'
         except Exception as e:
             logger.error(f"Jupiter health check failed: {e}")
             return False
     
-    async def get_quote(self, input_mint: str, output_mint: str, amount: int, 
-                       slippage_bps: int = 50) -> Optional[Dict]:
+    async def get_quote(self, input_mint: str, output_mint: str, amount: int,
+                       slippage_bps: int = 50) -> Optional[QuoteData]:
         """
-        Get swap quote from Jupiter
+        Get swap quote from Jupiter with monitoring
         
         Args:
             input_mint: Input token mint address
@@ -41,18 +86,29 @@ class JupiterClient(BaseAPIClient):
             slippage_bps: Slippage tolerance in basis points (50 = 0.5%)
             
         Returns:
-            Quote data or None if failed
+            QuoteData object or None if failed
         """
         try:
-            endpoint = "quote"
             params = {
-                'inputMint': input_mint,
-                'outputMint': output_mint,
-                'amount': str(amount),
-                'slippageBps': str(slippage_bps),
-                'onlyDirectRoutes': 'false',
-                'asLegacyTransaction': 'false'
+                "inputMint": input_mint,
+                "outputMint": output_mint,
+                "amount": str(amount),
+                "slippageBps": slippage_bps,
+                "onlyDirectRoutes": False,
+                "platformFeeBps": 0
             }
+            
+            data = await self._monitored_request("GET", "quote", params=params)
+            
+            return QuoteData(
+                input_mint=input_mint,
+                output_mint=output_mint,
+                in_amount=Decimal(data["inputAmount"]),
+                out_amount=Decimal(data["outputAmount"]),
+                price_impact=Decimal(data.get("priceImpactPct", "0")),
+                platform_fee=Decimal(data.get("platformFeePct", "0")),
+                route_plan=data.get("routePlan", [])
+            )
             
             response = await self.make_request('GET', endpoint, params=params)
             

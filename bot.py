@@ -1,26 +1,24 @@
+"""
+Main bot implementation using refactored command handlers
+"""
+
 import logging
 import asyncio
-import json
-from datetime import datetime, timedelta
-from typing import Dict
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-from web3 import Web3
+from telegram.ext import (
+    Application, 
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters
+)
 
 from config import Config
-from db import create_tables, get_db_session, User, WalletWatch, Token, Trade, AlertConfig, BlacklistEntry, ExecutorWallet
-from monitor import EnhancedMonitoringManager
-from analyzer import EnhancedTokenAnalyzer
-from executor import AdvancedTradeExecutor, KeystoreManager
-from pro_features import ProFeaturesManager
-from services.wallet_analyzer import wallet_analyzer
-from core.wallet_manager import wallet_manager
-from utils.formatting import format_token_analysis, format_price_alert, format_wallet_analysis, format_token_security
-from utils.bot_helpers import (
-    check_rate_limit, is_token_contract, add_to_watchlist, remove_from_watchlist,
-    get_user_watchlist, rename_watchlist_item, get_user_executor_wallets,
-    get_wallet_balance, get_executor_wallet, get_explorer_url, generate_executor_wallet
-)
+from handlers.start import StartCommand
+from handlers.portfolio import PortfolioCommand
+from handlers.help import HelpCommand
+from handlers.scan import ScanCommand
+from handlers.key_management import handle_keys_command, handle_keys_callback
+from bot.callback_data import CallbackData
 
 # Configure logging
 logging.basicConfig(
@@ -30,13 +28,127 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class MemeTraderBot:
+    """Main bot class"""
+    
     def __init__(self):
+        """Initialize bot and validate config"""
         Config.validate()
-        self.monitoring_manager = EnhancedMonitoringManager()
-        self.analyzer = EnhancedTokenAnalyzer()
-        self.executor = AdvancedTradeExecutor()
-        self.pro_features = ProFeaturesManager()
-        self.user_sessions = {}  # Track user sessions for multi-step operations
+        
+        # Initialize command handlers
+        self.start_handler = StartCommand()
+        self.portfolio_handler = PortfolioCommand()
+        self.help_handler = HelpCommand()
+        self.scan_handler = ScanCommand()
+        
+        # Initialize application
+        self.application = Application.builder().token(Config.TELEGRAM_TOKEN).build()
+        
+        # Register handlers
+        self._register_handlers()
+        
+    def _register_handlers(self):
+        """Register all command and callback handlers"""
+        
+        # Command handlers
+        self.application.add_handler(CommandHandler("start", self.start_handler))
+        self.application.add_handler(CommandHandler("menu", self.start_handler))
+        self.application.add_handler(CommandHandler("portfolio", self.portfolio_handler))
+        self.application.add_handler(CommandHandler("help", self.help_handler))
+        self.application.add_handler(CommandHandler("scan", self.scan_handler))
+        self.application.add_handler(CommandHandler("keys", handle_keys_command))
+        
+        # Callback handlers
+        self.application.add_handler(CallbackQueryHandler(self._handle_callback))
+        
+        # Error handler
+        self.application.add_error_handler(self._error_handler)
+        
+    async def _handle_callback(self, update, context):
+        """Route callbacks to appropriate handlers based on callback data"""
+        try:
+            # Parse callback data
+            callback_data = CallbackData.parse(update.callback_query.data)
+            
+            # Route to appropriate handler
+            if callback_data.command == "portfolio":
+                await self.portfolio_handler.show_portfolio(
+                    update,
+                    str(update.effective_user.id),
+                    callback_data.page or 0
+                )
+            elif callback_data.command == "keys":
+                await handle_keys_callback(update, context)
+            elif callback_data.command == "help":
+                await self.help_handler(update, context)
+            elif callback_data.command.startswith("scan"):
+                if callback_data.command == "scan_active":
+                    await self.scan_handler.show_active_scans(
+                        update,
+                        str(update.effective_user.id),
+                        callback_data.page or 0
+                    )
+                elif callback_data.command == "scan_new":
+                    await self.scan_handler.start_new_scan(
+                        update,
+                        str(update.effective_user.id),
+                        callback_data.data
+                    )
+                elif callback_data.command == "scan_discovery":
+                    await self.scan_handler.discovery_scan(
+                        update,
+                        str(update.effective_user.id),
+                        callback_data.page or 0
+                    )
+                else:
+                    await self.scan_handler(update, context)
+            elif callback_data.command in ["main_menu", "start"]:
+                await self.start_handler(update, context)
+            else:
+                logger.warning(f"Unknown callback command: {callback_data.command}")
+                
+        except Exception as e:
+            logger.error(f"Error handling callback: {e}", exc_info=True)
+            await update.callback_query.answer(
+                "❌ An error occurred. Please try again.",
+                show_alert=True
+            )
+            
+    async def _error_handler(self, update, context):
+        """Handle errors globally"""
+        logger.error("Update caused error", exc_info=context.error)
+        
+        try:
+            if update and update.effective_message:
+                await update.effective_message.reply_text(
+                    "❌ An error occurred. Please try again later or contact support if the issue persists."
+                )
+        except Exception as e:
+            logger.error(f"Error in error handler: {e}")
+            
+    async def start(self):
+        """Start the bot"""
+        try:
+            # Clear any existing webhook
+            await self.application.bot.delete_webhook(drop_pending_updates=True)
+            
+            # Start polling
+            await self.application.run_polling(allowed_updates=[])
+            
+        except Exception as e:
+            logger.error(f"Failed to start bot: {e}", exc_info=True)
+            raise
+            
+def run_bot():
+    """Run the bot"""
+    try:
+        bot = MemeTraderBot()
+        asyncio.run(bot.start())
+    except Exception as e:
+        logger.error(f"Bot crashed: {e}", exc_info=True)
+        raise
+
+if __name__ == "__main__":
+    run_bot()
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command with main menu"""

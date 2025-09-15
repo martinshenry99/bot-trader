@@ -71,6 +71,41 @@ async def check_database():
         logger.error(f"Database: FAILED - {e}")
         return False
 
+async def check_telegram_bot():
+    """Check Telegram bot connection and handlers"""
+    try:
+        import aiohttp
+        from config import Config
+        
+        async with aiohttp.ClientSession() as session:
+            # Test getMe endpoint
+            url = f"https://api.telegram.org/bot{Config.TELEGRAM_BOT_TOKEN}/getMe"
+            async with session.get(url) as response:
+                result = await response.json()
+                if not result.get("ok"):
+                    logger.error(f"Telegram Bot: FAILED - API error: {result.get('description')}")
+                    return False
+                    
+            # Test getUpdates endpoint
+            url = f"https://api.telegram.org/bot{Config.TELEGRAM_BOT_TOKEN}/getUpdates"
+            params = {"limit": 1, "timeout": 1}
+            async with session.get(url, params=params) as response:
+                result = await response.json()
+                if not result.get("ok"):
+                    logger.error(f"Telegram Bot: FAILED - Updates error: {result.get('description')}")
+                    return False
+                
+                updates = result.get("result", [])
+                if updates:
+                    logger.info(f"Telegram Bot: HEALTHY - Found {len(updates)} pending updates")
+                else:
+                    logger.info("Telegram Bot: HEALTHY - No pending updates")
+                return True
+                
+    except Exception as e:
+        logger.error(f"Telegram Bot: FAILED - {e}")
+        return False
+
 async def check_integrations():
     """Check API integrations"""
     try:

@@ -48,6 +48,13 @@ class Config:
     
     # Jupiter/Solana Configuration - Mainnet
     JUPITER_API_URL = os.getenv('JUPITER_API_URL', 'https://quote-api.jup.ag/v4/quote')
+    
+    # Webhook Configuration
+    WEBHOOK_HOST = os.getenv('WEBHOOK_HOST', '0.0.0.0')
+    WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', '8080'))
+    HELIUS_WEBHOOK_SECRET = os.getenv('HELIUS_WEBHOOK_SECRET')
+    COVALENT_WEBHOOK_SECRET = os.getenv('COVALENT_WEBHOOK_SECRET')
+    WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED', 'true').lower() == 'true'
     JUPITER_PRICE_API = os.getenv('JUPITER_PRICE_API', 'https://price.jup.ag/v4')
     
     # Database

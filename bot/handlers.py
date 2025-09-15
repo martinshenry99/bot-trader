@@ -4,7 +4,7 @@ Bot event handlers registration module
 
 import logging
 from typing import List, Tuple
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from bot.callbacks import register_handlers
 from bot.commands import get_bot_commands
 
@@ -16,9 +16,26 @@ def register_bot_handlers(app: Application) -> bool:
     Returns True if successful, False if any errors occurred
     """
     try:
+        logger.debug("Starting handler registration")
         commands = get_bot_commands()
         
-        # Basic command handlers
+        # Debug message handler to log all incoming messages
+        async def debug_message_handler(update, context):
+            logger.debug("=== Received Update ===")
+            logger.debug(f"Raw update: {update}")
+            if update.message:
+                logger.debug(f"Message text: {update.message.text}")
+                logger.debug(f"From user: {update.effective_user.id}")
+                logger.debug(f"Chat ID: {update.effective_chat.id}")
+            elif update.callback_query:
+                logger.debug(f"Callback query: {update.callback_query.data}")
+                logger.debug(f"From user: {update.effective_user.id}")
+            else:
+                logger.debug("No message or callback query found in update")
+            logger.debug("=====================")
+            return None  # Don't stop the handler chain
+            
+        # Basic command handlers first
         command_list: List[Tuple[str, callable]] = [
             ("start", commands.start),
             ("help", commands.help_command),
@@ -49,6 +66,10 @@ def register_bot_handlers(app: Application) -> bool:
         except Exception as e:
             logger.error(f"Failed to register callback handlers: {e}")
             return False
+            
+        # Add debug handler last to catch all unhandled messages
+        app.add_handler(MessageHandler(filters.ALL, debug_message_handler))
+        logger.debug("Added debug message handler")
             
         logger.info(f"Successfully registered {len(command_list)} commands")
         return True

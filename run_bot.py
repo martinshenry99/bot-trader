@@ -17,11 +17,11 @@ sys.path.insert(0, str(project_root))
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Set to DEBUG for more detailed logs
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('bot.log')
+        logging.FileHandler('bot.log', mode='w')  # Overwrite log file on each start
     ]
 )
 
@@ -47,6 +47,19 @@ async def error_handler(update, context):
                     text="❌ Bot instance conflict detected. Restarting..."
                 )
             sys.exit(1)
+            
+        # Add retry logic for network errors
+        if "getaddrinfo failed" in str(error):
+            logger.warning("Network error detected, retrying after delay...")
+            await asyncio.sleep(5)  # Wait 5 seconds before retry
+            if chat_id:
+                try:
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text="🔄 Network issue detected. Retrying connection..."
+                    )
+                except Exception:
+                    pass
             
         elif isinstance(error, NetworkError):
             logger.error(f"Network error: {error}")
@@ -118,11 +131,14 @@ def main():
         
         # Start the bot
         logger.info("Starting Telegram bot...")
+        logger.debug("Initializing bot commands...")
         from bot.commands import get_bot_commands
         commands = get_bot_commands()
         
         # Import telegram components
+        logger.debug("Importing Telegram components...")
         from telegram.ext import Application, CommandHandler
+        logger.debug("Successfully imported Telegram components")
         
         # Create application
         application = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
@@ -130,51 +146,12 @@ def main():
         # Add error handler
         application.add_error_handler(error_handler)
         
-        # Register all handlers using the new registration module
+        # Register all handlers using the unified registration module
         from bot.handlers import register_bot_handlers
-        
         if not register_bot_handlers(application):
             logger.error("Failed to register handlers - check logs for details")
             return False
-            
         logger.info("Successfully registered all handlers")
-        async def _start(update, context):
-            await update.message.reply_text("Meme Trader V4 Pro online. Try /scan or /watchlist.")
-        async def _help(update, context):
-            help_text = (
-                "Commands:\n"
-                "\n"
-                "- /start — Initialize the bot and show a quick intro\n"
-                "- /help — Show this help menu\n"
-                "\n"
-                "Discovery & Analysis:\n"
-                "- /scan — Discover high-performing trader wallets across chains\n"
-                "- /analyze <address> [chain] — Deep-dive wallet/token analysis\n"
-                "\n"
-                "Watchlist & Monitoring:\n"
-                "- /watchlist — Manage your watchlist (add/remove/list/rename)\n"
-                "\n"
-                "Trading & Portfolio:\n"
-                "- /buy <token_address> <amount> [chain] — Execute a buy order\n"
-                "- /sell <token_address> <amount> [chain] — Execute a sell order\n"
-                "- /portfolio — Show current tracked positions and PnL\n"
-                "- /panic_sell — Market-sell tracked tokens immediately (safety checks apply)\n"
-                "\n"
-                "Wallet & Security:\n"
-                "- /balance — Show balances for your configured wallets\n"
-                "- /address — Show your current executor wallet addresses\n"
-                "- /mnemonic — Keystore management options (import/export/create)\n"
-                "\n"
-                "Settings:\n"
-                "- /settings — View and change preferences (slippage, scoring thresholds, alerts)\n"
-            )
-            await update.message.reply_text(help_text)
-        application.add_handler(CommandHandler("start", _start))
-        application.add_handler(CommandHandler("help", _help))
-        
-        # Register new modular callback handlers
-        from bot.callbacks import register_handlers
-        register_handlers(application)
 
         # Set Telegram command menu via async post_init hook
         from telegram import BotCommand
@@ -220,8 +197,15 @@ def main():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        # Start the bot using PTB's built-in runner
-        application.run_polling(allowed_updates=['message', 'callback_query', 'my_chat_member'])
+        # Start the bot using PTB's built-in runner with enhanced settings
+        application.run_polling(
+            allowed_updates=['message', 'callback_query', 'my_chat_member'],
+            drop_pending_updates=True,  # Ensure clean start with no pending updates
+            pool_timeout=30,  # Longer timeout for poor connections
+            read_timeout=30,  # Longer read timeout
+            connect_timeout=30,  # Longer connect timeout
+            write_timeout=30  # Longer write timeout
+        )
         
     except ImportError as e:
         logger.error(f"Import error: {e}")

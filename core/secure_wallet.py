@@ -8,6 +8,302 @@ import json
 import logging
 from typing import Optional, Dict, Any
 from pathlib import Path
+from datetime import datetime
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+logger = logging.getLogger(__name__)
+
+class SecureWallet:
+    """Secure system for managing wallet mnemonics"""
+    
+    def __init__(self, config_dir: str):
+        self.config_dir = Path(config_dir)
+        self.wallet_file = self.config_dir / "wallets.enc"
+        self.salt_file = self.config_dir / "salt"
+        
+        # Ensure config directory exists
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize encryption
+        self._init_encryption()
+    
+    def _init_encryption(self):
+        """Initialize encryption system"""
+        try:
+            # Generate or load salt
+            if self.salt_file.exists():
+                with open(self.salt_file, 'rb') as f:
+                    self.salt = f.read()
+            else:
+                self.salt = os.urandom(16)
+                with open(self.salt_file, 'wb') as f:
+                    f.write(self.salt)
+            
+        except Exception as e:
+            logger.error(f"Error initializing encryption: {str(e)}")
+            raise
+    
+    def _get_encryption_key(self, password: str) -> bytes:
+        """Derive encryption key from password"""
+        try:
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=self.salt,
+                iterations=100000
+            )
+            
+            return base64.urlsafe_b64encode(
+                kdf.derive(password.encode())
+            )
+            
+        except Exception as e:
+            logger.error(f"Error generating encryption key: {str(e)}")
+            raise
+    
+    def generate_mnemonic(
+        self,
+        name: str,
+        password: str,
+        strength: int = 256
+    ) -> str:
+        """Generate new wallet mnemonic"""
+        try:
+            # Import here to avoid logging
+            from eth_account import Account
+            import secrets
+            
+            # Generate mnemonic
+            entropy = secrets.token_bytes(strength // 8)
+            account = Account.from_key(entropy)
+            mnemonic = account._mnemonic
+            
+            # Store securely
+            self.store_mnemonic(name, mnemonic, password)
+            
+            return mnemonic
+            
+        except Exception as e:
+            logger.error(f"Error generating mnemonic: {str(e)}")
+            raise
+        finally:
+            # Clear sensitive data
+            if 'mnemonic' in locals():
+                del mnemonic
+            if 'entropy' in locals():
+                del entropy
+    
+    def import_mnemonic(
+        self,
+        name: str,
+        mnemonic: str,
+        password: str
+    ) -> bool:
+        """Import existing mnemonic"""
+        try:
+            # Validate mnemonic
+            self._validate_mnemonic(mnemonic)
+            
+            # Store securely
+            self.store_mnemonic(name, mnemonic, password)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error importing mnemonic: {str(e)}")
+            raise
+        finally:
+            # Clear sensitive data
+            if 'mnemonic' in locals():
+                del mnemonic
+    
+    def store_mnemonic(
+        self,
+        name: str,
+        mnemonic: str,
+        password: str
+    ):
+        """Securely store mnemonic"""
+        try:
+            # Get encryption key
+            key = self._get_encryption_key(password)
+            f = Fernet(key)
+            
+            # Load existing wallets
+            wallets = self._load_wallets(password)
+            
+            # Encrypt and store
+            encrypted = f.encrypt(mnemonic.encode())
+            wallets[name] = {
+                'encrypted_mnemonic': encrypted.decode(),
+                'created_at': str(datetime.utcnow())
+            }
+            
+            # Save updated wallets
+            self._save_wallets(wallets, password)
+            
+        except Exception as e:
+            logger.error(f"Error storing mnemonic: {str(e)}")
+            raise
+        finally:
+            # Clear sensitive data
+            if 'mnemonic' in locals():
+                del mnemonic
+            if 'key' in locals():
+                del key
+    
+    def export_mnemonic(
+        self,
+        name: str,
+        password: str
+    ) -> Optional[str]:
+        """Export mnemonic for backup"""
+        try:
+            # Get encryption key
+            key = self._get_encryption_key(password)
+            f = Fernet(key)
+            
+            # Load wallets
+            wallets = self._load_wallets(password)
+            
+            if name not in wallets:
+                raise ValueError(f"Wallet {name} not found")
+            
+            # Decrypt mnemonic
+            encrypted = wallets[name]['encrypted_mnemonic'].encode()
+            mnemonic = f.decrypt(encrypted).decode()
+            
+            return mnemonic
+            
+        except Exception as e:
+            logger.error(f"Error exporting mnemonic: {str(e)}")
+            raise
+        finally:
+            # Clear sensitive data
+            if 'mnemonic' in locals():
+                del mnemonic
+            if 'key' in locals():
+                del key
+    
+    def delete_mnemonic(
+        self,
+        name: str,
+        password: str,
+        confirmation: str
+    ) -> bool:
+        """Safely delete stored mnemonic"""
+        try:
+            # Verify confirmation
+            if confirmation != f"DELETE {name}":
+                raise ValueError("Invalid confirmation")
+            
+            # Load wallets
+            wallets = self._load_wallets(password)
+            
+            if name not in wallets:
+                raise ValueError(f"Wallet {name} not found")
+            
+            # Securely delete
+            wallets.pop(name)
+            self._save_wallets(wallets, password)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting mnemonic: {str(e)}")
+            raise
+    
+    def get_addresses(self, password: str) -> Dict[str, str]:
+        """Get addresses for all stored wallets"""
+        try:
+            # Import here to avoid logging
+            from eth_account import Account
+            
+            addresses = {}
+            wallets = self._load_wallets(password)
+            
+            for name, data in wallets.items():
+                # Get encryption key
+                key = self._get_encryption_key(password)
+                f = Fernet(key)
+                
+                # Decrypt mnemonic
+                encrypted = data['encrypted_mnemonic'].encode()
+                mnemonic = f.decrypt(encrypted).decode()
+                
+                # Get address
+                account = Account.from_mnemonic(mnemonic)
+                addresses[name] = account.address
+            
+            return addresses
+            
+        except Exception as e:
+            logger.error(f"Error getting addresses: {str(e)}")
+            raise
+        finally:
+            # Clear sensitive data
+            if 'mnemonic' in locals():
+                del mnemonic
+            if 'key' in locals():
+                del key
+    
+    def _load_wallets(self, password: str) -> Dict:
+        """Load encrypted wallets"""
+        try:
+            if not self.wallet_file.exists():
+                return {}
+            
+            # Get encryption key
+            key = self._get_encryption_key(password)
+            f = Fernet(key)
+            
+            # Load and decrypt
+            with open(self.wallet_file, 'rb') as file:
+                encrypted = file.read()
+                if encrypted:
+                    decrypted = f.decrypt(encrypted)
+                    return json.loads(decrypted)
+                return {}
+            
+        except Exception as e:
+            logger.error(f"Error loading wallets: {str(e)}")
+            raise
+    
+    def _save_wallets(self, wallets: Dict, password: str):
+        """Save encrypted wallets"""
+        try:
+            # Get encryption key
+            key = self._get_encryption_key(password)
+            f = Fernet(key)
+            
+            # Encrypt and save
+            encrypted = f.encrypt(json.dumps(wallets).encode())
+            
+            with open(self.wallet_file, 'wb') as file:
+                file.write(encrypted)
+            
+        except Exception as e:
+            logger.error(f"Error saving wallets: {str(e)}")
+            raise
+    
+    def _validate_mnemonic(self, mnemonic: str):
+        """Validate mnemonic phrase"""
+        try:
+            # Import here to avoid logging
+            from eth_account import Account
+            
+            # Validate by attempting to create account
+            Account.from_mnemonic(mnemonic)
+            
+        except Exception as e:
+            raise ValueError("Invalid mnemonic phrase")
+        finally:
+            # Clear sensitive data
+            if 'mnemonic' in locals():
+                del mnemonic
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
